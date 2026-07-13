@@ -50,16 +50,37 @@ model.onDidChangeContent(() => lintModel(monaco, model)); // ...and on every edi
 | `QL002` | error     | An assignment that appears before any `[Section]` header (*"Assignment outside of section"*). |
 | `QL010` | warning   | An unknown section (a typo like `[Continer]`, or a section for the wrong file type). `X-` user sections are always allowed. |
 | `QL020` | warning   | A duplicate of a key that is **known to be single-valued** — so the last-one-wins behavior is almost certainly a mistake. |
+| `QL030` | warning   | A key that is **not documented for its section** (a typo, or an option from a newer Podman than this build knows). Only Quadlet-specific sections are checked. |
 
 Diagnostic codes are exported as `Codes` for programmatic use.
 
-### Why duplicate detection is conservative
+### Why key checks are conservative
 
-Many Quadlet keys legitimately repeat and accumulate (`Volume=`, `PublishPort=`, `Environment=`, `Label=`, `AddCapability=`, …). Flagging every duplicate would produce constant false positives. So `QL020` only fires for a curated set of keys we are confident are single-valued (see [`src/sections.ts`](src/sections.ts)). A key we haven't classified is assumed possibly-repeatable and never flagged.
+Both key rules are warnings, never errors, and both lean toward silence:
+
+- **`QL020` (duplicates)** — many Quadlet keys legitimately repeat and accumulate (`Volume=`, `PublishPort=`, `Environment=`, `Label=`, `AddCapability=`, …). Flagging every duplicate would produce constant false positives, so `QL020` fires *only* for keys the docs prove are single-valued. A key of unknown repeatability is never flagged.
+- **`QL030` (unknown keys)** — checked only for the Quadlet-specific sections (`[Container]`, `[Pod]`, …), where the man page gives an authoritative key list. The open-ended standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) and `X-` sections are never key-checked. It stays a warning because the key list is a doc snapshot: a key from a newer Podman must never be reported as a hard error.
+
+### Where the key data comes from
+
+The per-section key lists and their repeatability are **extracted from a vendored copy of the Podman man page** (`References/podman-systemd.unit.5.md`) into a committed data file, [`src/generated/keys.ts`](src/generated/keys.ts). This keeps the runtime dependency-free (no markdown parsing at load) and the data reviewable in git diffs.
+
+The canonical upstream source is:
+<https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html>
+
+**The committed data is a snapshot, not a live feed.** It reflects the doc as of the last regeneration and ships frozen in the published package — clients get whatever was current when that version was published, not "the latest". Keeping key data current is a maintenance step: refresh the vendored doc from upstream, regenerate, and publish a new version.
+
+```sh
+# 1. refresh References/podman-systemd.unit.5.md from the upstream URL above
+npm run gen:keys   # 2. re-extract src/generated/keys.ts
+npm test           # 3. sanity-check the regenerated data
+# 4. commit + publish a new version
+```
+
+This snapshot model is also why the key rules are warnings, not errors (see above): a client on an older snapshot must never hard-fail a file that uses a newer, still-valid Podman key.
 
 ## Roadmap
 
-- **Per-section key-name validation**, sourced from the Podman docs tables (kept as a warning — the risk of false positives on new/unknown keys is high).
 - **`quadlet-lint-vscode`** — a VS Code extension over the Diagnostics API, reusing this same core.
 
 ## Non-goals

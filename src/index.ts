@@ -10,7 +10,13 @@
  * most a `warning`.
  */
 
-import { KNOWN_SECTIONS, isUserDefinedSection, isSingleValueKey } from "./sections.js";
+import {
+  KNOWN_SECTIONS,
+  isUserDefinedSection,
+  isSingleValueKey,
+  isKnownKey,
+  hasKeyData,
+} from "./sections.js";
 
 export type Severity = "error" | "warning";
 
@@ -42,6 +48,8 @@ export const Codes = {
   UNKNOWN_SECTION: "QL010",
   /** A single-valued key that appears more than once in the same section. */
   DUPLICATE_KEY: "QL020",
+  /** A key that is not documented for its (Quadlet-specific) section. */
+  UNKNOWN_KEY: "QL030",
 } as const;
 
 /** A section header line, e.g. `[Container]`. */
@@ -151,6 +159,22 @@ export function lintQuadlet(text: string): Diagnostic[] {
       });
       inContinuation = endsWithContinuation(raw);
       continue;
+    }
+
+    // Unknown-key detection, restricted to the Quadlet-specific sections we
+    // have authoritative key lists for. Standard systemd sections
+    // ([Unit]/[Service]/[Install]) are left alone — their key surface is
+    // open-ended. Kept a warning: the key list is a doc snapshot, so a newer
+    // Podman key must never be reported as a hard error.
+    if (hasKeyData(currentSection) && !isKnownKey(currentSection, key)) {
+      diagnostics.push({
+        line: lineNo,
+        startColumn: keyStart + 1,
+        endColumn: keyStart + key.length + 1,
+        severity: "warning",
+        code: Codes.UNKNOWN_KEY,
+        message: `Unknown key "${key}" in [${currentSection}]. Check for a typo, or it may be from a newer Podman version.`,
+      });
     }
 
     // Duplicate detection, restricted to keys we know are single-valued so that

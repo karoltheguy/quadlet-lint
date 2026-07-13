@@ -96,10 +96,20 @@ describe("QL010 unknown section", () => {
     expect(diags[0]).toMatchObject({ code: Codes.UNKNOWN_SECTION });
   });
 
-  it("accepts all known quadlet sections", () => {
-    for (const s of ["Unit", "Service", "Install", "Container", "Pod", "Network", "Volume", "Kube", "Build", "Image"]) {
-      expect(lintQuadlet(`[${s}]\nKey=val`)).toEqual([]);
+  it("accepts all known sections (header alone, no unknown-section warning)", () => {
+    const sections = [
+      "Unit", "Service", "Install", // standard systemd
+      "Container", "Pod", "Network", "Volume", "Kube", "Build", "Image", "Artifact", "Quadlet",
+    ];
+    for (const s of sections) {
+      expect(lintQuadlet(`[${s}]\n`)).toEqual([]);
     }
+  });
+
+  it("recognizes the [Artifact] and [Quadlet] sections", () => {
+    // Regression: these were previously missing from KNOWN_SECTIONS.
+    expect(lintQuadlet("[Artifact]\n")).toEqual([]);
+    expect(lintQuadlet("[Quadlet]\nDefaultDependencies=false")).toEqual([]);
   });
 });
 
@@ -137,8 +147,41 @@ describe("QL020 duplicate single-valued key", () => {
     expect(lintQuadlet(text)).toEqual([]);
   });
 
-  it("does not flag unknown keys (assumed possibly-repeatable)", () => {
-    expect(lintQuadlet("[Container]\nSomeFutureKey=a\nSomeFutureKey=b")).toEqual([]);
+  it("does not flag repeated occurrences of a repeatable key", () => {
+    // PublishPort is a valid, repeatable key — neither QL020 nor QL030 should fire.
+    expect(lintQuadlet("[Container]\nPublishPort=1:1\nPublishPort=2:2")).toEqual([]);
+  });
+});
+
+describe("QL030 unknown key", () => {
+  it("flags a key not documented for the section", () => {
+    const diags = lintQuadlet("[Container]\nSomeFutureKey=a");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: Codes.UNKNOWN_KEY,
+      severity: "warning",
+      line: 2,
+    });
+  });
+
+  it("does not validate keys in standard systemd sections", () => {
+    // [Unit]/[Service]/[Install] have an open-ended key surface we don't own.
+    expect(lintQuadlet("[Unit]\nAnythingGoesHere=1")).toEqual([]);
+    expect(lintQuadlet("[Service]\nRestart=always\nWhateverKey=x")).toEqual([]);
+    expect(lintQuadlet("[Install]\nWantedBy=default.target")).toEqual([]);
+  });
+
+  it("accepts documented keys across sections", () => {
+    expect(lintQuadlet("[Container]\nImage=x\nPublishPort=8080:80\nEnvironment=A=1")).toEqual([]);
+    expect(lintQuadlet("[Volume]\nDriver=local\nVolumeName=data")).toEqual([]);
+    expect(lintQuadlet("[Network]\nNetworkName=web\nSubnet=10.0.0.0/24")).toEqual([]);
+  });
+
+  it("does not validate keys in unknown or X- sections", () => {
+    // No authoritative list -> no key validation (the section itself may warn).
+    expect(lintQuadlet("[X-Custom]\nWhatever=1")).toEqual([]);
+    const diags = lintQuadlet("[Bogus]\nWhatever=1");
+    expect(diags.every((d) => d.code !== Codes.UNKNOWN_KEY)).toBe(true);
   });
 });
 

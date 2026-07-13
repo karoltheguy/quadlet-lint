@@ -1,7 +1,7 @@
 {
   "name": "quadlet-lint",
   "version": "0.1.0",
-  "description": "Fast, dependency-free linting for Podman Quadlet unit files, with a Monaco Editor adapter.",
+  "description": "Linting for Podman Quadlet unit files, with a Monaco Editor adapter.",
   "keywords": [
     "podman",
     "quadlet",
@@ -32,6 +32,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsup",
+    "gen:keys": "node scripts/extract-keys.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
