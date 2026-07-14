@@ -11,6 +11,7 @@
  */
 
 import { SECTION_KEYS } from "./generated/keys.js";
+import { SECTION_ENUMS } from "./enums.js";
 
 /** Standard systemd sections, valid in any unit file. */
 const SYSTEMD_SECTIONS = ["Unit", "Service", "Install"] as const;
@@ -59,6 +60,16 @@ export function isKnownKey(section: string, key: string): boolean {
  */
 export function isSingleValueKey(section: string, key: string): boolean {
   return SECTION_KEYS[section]?.singleValue.has(key) ?? false;
+}
+
+/**
+ * The set of allowed values for `key` in `section`, if we have a curated
+ * closed-set enum for it. Returns undefined when the key is free-form (or
+ * simply not in our curated table), in which case no enum validation should
+ * be attempted.
+ */
+export function getEnumValues(section: string, key: string): ReadonlySet<string> | undefined {
+  return SECTION_ENUMS[section]?.[key];
 }
 
 /** Quadlet file extension (without the leading dot) to the section it implies. */

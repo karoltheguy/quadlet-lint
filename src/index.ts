@@ -16,6 +16,7 @@ import {
   isSingleValueKey,
   isKnownKey,
   hasKeyData,
+  getEnumValues,
 } from "./sections.js";
 
 export type Severity = "error" | "warning";
@@ -50,6 +51,8 @@ export const Codes = {
   DUPLICATE_KEY: "QL020",
   /** A key that is not documented for its (Quadlet-specific) section. */
   UNKNOWN_KEY: "QL030",
+  /** A value outside the curated closed set of allowed values for its key. */
+  ENUM_VALUE: "QL040",
 } as const;
 
 /** A section header line, e.g. `[Container]`. */
@@ -177,6 +180,33 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
         code: Codes.UNKNOWN_KEY,
         message: `Unknown key "${key}" in [${currentSection}]. Check for a typo, or it may be from a newer Podman version.`,
       });
+    }
+
+    // Enum-value detection, restricted to keys we have a curated closed-set
+    // vocabulary for. The table is a hand-curated doc snapshot, not the
+    // authoritative Quadlet parser, so this stays a warning even when a value
+    // isn't recognized — it may simply be valid in a newer Podman version.
+    // Multi-line (continued) values are out of scope: we only ever see the
+    // first physical line's tail, which isn't the full value.
+    if (!endsWithContinuation(raw)) {
+      const allowed = getEnumValues(currentSection, key);
+      if (allowed !== undefined) {
+        const rawValue = raw.slice(eq + 1);
+        const value = rawValue.trim();
+        const hasInterpolation =
+          value.includes("$") || value.includes("`") || value.includes("%") || value.includes("{{");
+        if (value !== "" && !hasInterpolation && !allowed.has(value.toLowerCase())) {
+          const valueStart = eq + 1 + (rawValue.length - rawValue.trimStart().length);
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.ENUM_VALUE,
+            message: `Unrecognized value "${value}" for ${key}= — expected one of: ${[...allowed].join(", ")}. It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
     }
 
     // Duplicate detection, restricted to keys we know are single-valued so that

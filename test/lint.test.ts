@@ -200,6 +200,60 @@ describe("line continuations", () => {
   });
 });
 
+describe("QL040 enum values", () => {
+  /** Convenience: QL040 diagnostics present in a lint run. */
+  function ql040(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL040");
+  }
+
+  it("flags an unrecognized Pull value with a precise value-only range", () => {
+    const diags = ql040("[Container]\nImage=img\nPull=sometimes");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL040",
+      severity: "warning",
+      line: 3,
+      startColumn: 6,
+      endColumn: 15,
+    });
+  });
+
+  it("does not flag a documented Pull value", () => {
+    expect(ql040("[Container]\nImage=img\nPull=always")).toEqual([]);
+  });
+
+  it("accepts numeric and case-insensitive booleans for ReadOnly", () => {
+    expect(ql040("[Container]\nImage=img\nReadOnly=1")).toEqual([]);
+    expect(ql040("[Container]\nImage=img\nReadOnly=TRUE")).toEqual([]);
+  });
+
+  it("does not flag keys with no curated enum entry", () => {
+    expect(ql040("[Container]\nImage=img\nNotify=healthy")).toEqual([]);
+  });
+
+  it("never flags free-form keys", () => {
+    expect(ql040("[Container]\nImage=whatever")).toEqual([]);
+    expect(
+      ql040("[Container]\nImage=img\nEnvironment=FOO=bar\nEnvironment=FOO=bar"),
+    ).toEqual([]);
+  });
+
+  it("does not validate interpolated values", () => {
+    expect(ql040("[Container]\nImage=img\nPull=${POLICY}")).toEqual([]);
+    expect(ql040("[Container]\nImage=img\nReadOnly=%i")).toEqual([]);
+  });
+
+  it("skips values that span a line continuation", () => {
+    const text = "[Container]\nImage=img\nPull=alw\\\ncontinued";
+    expect(ql040(text)).toEqual([]);
+  });
+
+  it("validates Pod ExitPolicy", () => {
+    expect(ql040("[Pod]\nExitPolicy=stop")).toEqual([]);
+    expect(ql040("[Pod]\nExitPolicy=restart")).toHaveLength(1);
+  });
+});
+
 describe("diagnostics are ordered and well-formed", () => {
   it("returns results in source order with 1-based positions", () => {
     const text = "badline\n[Oops]\nImage=a\nImage=b";
