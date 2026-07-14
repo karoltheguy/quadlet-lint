@@ -62,8 +62,12 @@ export const Codes = {
   SECTION_FILE_MISMATCH: "QL050",
 } as const;
 
-/** A section header line, e.g. `[Container]`. */
-const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
+/**
+ * A section header line, e.g. `[Container]`. Exported for internal reuse by
+ * the service layer (src/service.ts), which needs to mirror this same line
+ * classification when locating the hovered key.
+ */
+export const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
 
 /**
  * Lint Quadlet unit file text.
@@ -291,8 +295,11 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
  * Whether a physical line continues onto the next one. systemd uses a trailing
  * backslash as the continuation marker; an even number of trailing backslashes
  * is an escaped backslash and does NOT continue.
+ *
+ * Exported for internal reuse by the service layer (src/service.ts), which
+ * needs to mirror this same continuation-tracking logic when walking lines.
  */
-function endsWithContinuation(raw: string): boolean {
+export function endsWithContinuation(raw: string): boolean {
   let backslashes = 0;
   for (let i = raw.length - 1; i >= 0 && raw[i] === "\\"; i--) {
     backslashes++;

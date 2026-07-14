@@ -72,6 +72,16 @@ export function getEnumValues(section: string, key: string): ReadonlySet<string>
   return SECTION_ENUMS[section]?.[key];
 }
 
+/**
+ * The documentation description for `key` in `section`, if we have one.
+ * Returns null when the section has no key data, the key is unknown, or the
+ * key is documented without a standalone description (e.g. only appears in a
+ * "Valid options" table).
+ */
+export function getKeyDescription(section: string, key: string): string | null {
+  return SECTION_KEYS[section]?.descriptions[key] ?? null;
+}
+
 /** Quadlet file extension (without the leading dot) to the section it implies. */
 const EXTENSION_SECTIONS: Readonly<Record<string, string>> = {
   container: "Container",

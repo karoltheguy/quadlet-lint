@@ -25,6 +25,11 @@
       "types": "./dist/monaco.d.ts",
       "import": "./dist/monaco.js",
       "require": "./dist/monaco.cjs"
+    },
+    "./service": {
+      "types": "./dist/service.d.ts",
+      "import": "./dist/service.js",
+      "require": "./dist/service.cjs"
     }
   },
   "main": "./dist/index.cjs",
