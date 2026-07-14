@@ -51,15 +51,17 @@ model.onDidChangeContent(() => lintModel(monaco, model)); // ...and on every edi
 | `QL010` | warning   | An unknown section (a typo like `[Continer]`, or a section for the wrong file type). `X-` user sections are always allowed. |
 | `QL020` | warning   | A duplicate of a key that is **known to be single-valued** — so the last-one-wins behavior is almost certainly a mistake. |
 | `QL030` | warning   | A key that is **not documented for its section** (a typo, or an option from a newer Podman than this build knows). Only Quadlet-specific sections are checked. |
+| `QL040` | warning   | A value outside the **known closed value set** for its key (e.g. `Pull=sometimes`), from a small hand-curated enum table. Values compare case-insensitively. |
 
 Diagnostic codes are exported as `Codes` for programmatic use.
 
 ### Why key checks are conservative
 
-Both key rules are warnings, never errors, and both lean toward silence:
+The key and value rules are warnings, never errors, and all lean toward silence:
 
 - **`QL020` (duplicates)** — many Quadlet keys legitimately repeat and accumulate (`Volume=`, `PublishPort=`, `Environment=`, `Label=`, `AddCapability=`, …). Flagging every duplicate would produce constant false positives, so `QL020` fires *only* for keys the docs prove are single-valued. A key of unknown repeatability is never flagged.
 - **`QL030` (unknown keys)** — checked only for the Quadlet-specific sections (`[Container]`, `[Pod]`, …), where the man page gives an authoritative key list. The open-ended standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) and `X-` sections are never key-checked. It stays a warning because the key list is a doc snapshot: a key from a newer Podman must never be reported as a hard error.
+- **`QL040` (enum values)** — checked only for keys in a hand-curated, source-cited table (`src/enums.ts`) whose value sets are provably closed (e.g. `Pull=`, `ExitPolicy=`, documented booleans — including the `1`/`0` spellings). Keys with open or pattern-shaped value sets (`Notify=`, `AutoUpdate=`) are deliberately omitted, and values containing interpolation (`$`, `%`, backticks, `{{`) or spanning continuation lines are never judged. Omission is always the safe default.
 
 ### Where the key data comes from
 
