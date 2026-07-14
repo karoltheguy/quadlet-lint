@@ -99,4 +99,4 @@ npm run build       # tsup → dist (ESM + CJS + .d.ts)
 
 ## License
 
-GPL-3.0-or-later. (Note: if you intend to publish the eventual VS Code extension to the Marketplace, a permissive license such as MIT is friendlier there — worth reconsidering before the `quadlet-lint-vscode` package ships.)
+MIT. Relicensed from GPL-3.0-or-later per the project roadmap, ahead of the eventual `quadlet-lint-vscode` extension shipping to the VS Code Marketplace.

@@ -10,7 +10,7 @@
     "monaco",
     "monaco-editor"
   ],
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "type": "module",
   "files": [
     "dist"
