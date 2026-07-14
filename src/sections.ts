@@ -60,3 +60,31 @@ export function isKnownKey(section: string, key: string): boolean {
 export function isSingleValueKey(section: string, key: string): boolean {
   return SECTION_KEYS[section]?.singleValue.has(key) ?? false;
 }
+
+/** Quadlet file extension (without the leading dot) to the section it implies. */
+const EXTENSION_SECTIONS: Readonly<Record<string, string>> = {
+  container: "Container",
+  pod: "Pod",
+  network: "Network",
+  volume: "Volume",
+  kube: "Kube",
+  build: "Build",
+  image: "Image",
+  artifact: "Artifact",
+};
+
+/**
+ * The Quadlet section a unit file's own extension implies, e.g. `web.container`
+ * implies `[Container]`. Matching is case-sensitive on the extension after the
+ * last `.` of the basename. Returns null for extensions we don't recognize or
+ * names with no extension at all. Resolution of `.conf` drop-ins (which inherit
+ * their target unit's section) is deliberately out of scope here and is handled
+ * later by QL050.
+ */
+export function expectedSectionFor(fileName: string): string | null {
+  const base = fileName.split("/").pop() ?? fileName;
+  const dot = base.lastIndexOf(".");
+  if (dot === -1) return null;
+  const ext = base.slice(dot + 1);
+  return EXTENSION_SECTIONS[ext] ?? null;
+}

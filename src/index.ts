@@ -59,9 +59,11 @@ const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
  * Lint Quadlet unit file text.
  *
  * @param text Full unit file contents.
+ * @param options.fileName Optional source file name. Currently unused here;
+ *   reserved for section-extension cross-checks (QL050).
  * @returns Diagnostics in source order (by line, then column).
  */
-export function lintQuadlet(text: string): Diagnostic[] {
+export function lintQuadlet(text: string, options?: { fileName?: string }): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const lines = text.split(/\r?\n/);
 
