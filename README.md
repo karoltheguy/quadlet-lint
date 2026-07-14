@@ -23,6 +23,9 @@ import { lintQuadlet } from "quadlet-lint";
 
 const diagnostics = lintQuadlet(text);
 // → [{ line, startColumn, endColumn, severity: "error" | "warning", code, message }]
+
+// Pass the file name to also get section ↔ file-type cross-checks (QL050):
+const withFileChecks = lintQuadlet(text, { fileName: "web.container" });
 ```
 
 All positions are **1-based**, matching Monaco: `startColumn` is the first character, `endColumn` is just past the last (exclusive).
@@ -52,6 +55,7 @@ model.onDidChangeContent(() => lintModel(monaco, model)); // ...and on every edi
 | `QL020` | warning   | A duplicate of a key that is **known to be single-valued** — so the last-one-wins behavior is almost certainly a mistake. |
 | `QL030` | warning   | A key that is **not documented for its section** (a typo, or an option from a newer Podman than this build knows). Only Quadlet-specific sections are checked. |
 | `QL040` | warning   | A value outside the **known closed value set** for its key (e.g. `Pull=sometimes`), from a small hand-curated enum table. Values compare case-insensitively. |
+| `QL050` | warning / error | Only when a `fileName` is passed: a file-type-specific section that doesn't match the file's type (warning — the section is ignored), or the expected section missing entirely (error — Quadlet fails to generate a service). Drop-in `.conf` files are recognized via their `<type>.d` parent directory and are exempt from the missing-section error. |
 
 Diagnostic codes are exported as `Codes` for programmatic use.
 
@@ -62,6 +66,7 @@ The key and value rules are warnings, never errors, and all lean toward silence:
 - **`QL020` (duplicates)** — many Quadlet keys legitimately repeat and accumulate (`Volume=`, `PublishPort=`, `Environment=`, `Label=`, `AddCapability=`, …). Flagging every duplicate would produce constant false positives, so `QL020` fires *only* for keys the docs prove are single-valued. A key of unknown repeatability is never flagged.
 - **`QL030` (unknown keys)** — checked only for the Quadlet-specific sections (`[Container]`, `[Pod]`, …), where the man page gives an authoritative key list. The open-ended standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) and `X-` sections are never key-checked. It stays a warning because the key list is a doc snapshot: a key from a newer Podman must never be reported as a hard error.
 - **`QL040` (enum values)** — checked only for keys in a hand-curated, source-cited table (`src/enums.ts`) whose value sets are provably closed (e.g. `Pull=`, `ExitPolicy=`, documented booleans — including the `1`/`0` spellings). Keys with open or pattern-shaped value sets (`Notify=`, `AutoUpdate=`) are deliberately omitted, and values containing interpolation (`$`, `%`, backticks, `{{`) or spanning continuation lines are never judged. Omission is always the safe default.
+- **`QL050` (section ↔ file type)** — needs an explicit `fileName` option to activate at all; file-name matching is case-sensitive, exactly as Quadlet's own is (a wrongly-cased extension means Quadlet ignores the file, so it must produce no diagnostics). The type-agnostic `[Quadlet]` section, the standard systemd sections, and `X-` sections are never cross-checked, and drop-ins legitimately omit the main section, so only their *mismatched* sections warn.
 
 ### Where the key data comes from
 
