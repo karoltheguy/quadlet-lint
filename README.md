@@ -30,6 +30,28 @@ const withFileChecks = lintQuadlet(text, { fileName: "web.container" });
 
 All positions are **1-based**, matching Monaco: `startColumn` is the first character, `endColumn` is just past the last (exclusive).
 
+## CLI usage
+
+Lint a file straight from the terminal — no editor, no code:
+
+```sh
+npx quadlet-lint web.container
+# or, once installed: quadlet-lint web.container
+```
+
+It prints one line per diagnostic and infers the section ↔ file-type checks (QL050) from the file name:
+
+```
+web.container:3:1: error QL050 Missing required [Container] section — Quadlet fails to generate a service without it.
+web.container:5:1: warning QL010 Unknown section "[Instal]". This will be ignored — check for a typo or a wrong file type.
+```
+
+The **exit code** makes it usable as a gate in CI or a pre-commit hook: it exits **non-zero when any diagnostic is an `error`**, and **`0`** when the file is clean or has only warnings (warnings still print). A missing argument or an unreadable file exits `2`.
+
+```sh
+quadlet-lint web.container && echo "ok to ship"
+```
+
 ## Monaco usage
 
 The Monaco binding is a thin adapter over the core. Pass in your Monaco namespace so the adapter stays agnostic to how Monaco was loaded (bundler, AMD, CDN):
