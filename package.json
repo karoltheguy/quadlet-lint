@@ -12,8 +12,12 @@
   ],
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "quadlet-lint": "bin/quadlet-lint.mjs"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "exports": {
     ".": {

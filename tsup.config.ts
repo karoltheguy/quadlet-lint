@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     monaco: "src/monaco.ts",
     service: "src/service.ts",
+    cli: "src/cli.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
