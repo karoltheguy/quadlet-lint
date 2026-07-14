@@ -71,6 +71,9 @@ export const Codes = {
  */
 export const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
 
+/** Matches a `# quadlet-lint-disable-next-line QLxxx` suppression directive comment. */
+const DISABLE_NEXT_LINE_RE = /^#\s*quadlet-lint-disable-next-line\s+(QL\d{3})\b/;
+
 /**
  * Lint Quadlet unit file text.
  *
@@ -83,6 +86,8 @@ export const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
 export function lintQuadlet(text: string, options?: { fileName?: string }): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const lines = text.split(/\r?\n/);
+  const suppress = new Map<number, Set<string>>();
+  let pendingSuppress = new Set<string>();
 
   // QL050 only activates when the caller supplies a fileName we can resolve
   // to an expected section (a recognized Quadlet extension, or a `.conf`
@@ -121,7 +126,14 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
     // Blank lines and comments are always fine. systemd treats lines starting
     // with '#' or ';' as comments.
     if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+      const directive = DISABLE_NEXT_LINE_RE.exec(trimmed);
+      if (directive) pendingSuppress.add(directive[1]!);
       continue;
+    }
+
+    if (pendingSuppress.size > 0) {
+      suppress.set(lineNo, new Set(pendingSuppress));
+      pendingSuppress.clear();
     }
 
     // Section header.
@@ -294,7 +306,7 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
     });
   }
 
-  return diagnostics;
+  return diagnostics.filter((d) => !suppress.get(d.line)?.has(d.code));
 }
 
 /**

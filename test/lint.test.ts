@@ -377,3 +377,45 @@ describe("diagnostics are ordered and well-formed", () => {
     }
   });
 });
+
+describe("suppression comments (# quadlet-lint-disable-next-line)", () => {
+  it("suppresses the named code on the immediately following line", () => {
+    const diags = lintQuadlet("# quadlet-lint-disable-next-line QL010\n[Instal]\n");
+    expect(diags.every((d) => d.code !== Codes.UNKNOWN_SECTION)).toBe(true);
+
+    // Baseline sanity check: without the directive, the warning does fire.
+    const baseline = lintQuadlet("[Instal]\n");
+    expect(baseline.some((d) => d.code === Codes.UNKNOWN_SECTION)).toBe(true);
+  });
+
+  it("still suppresses across an intervening blank line", () => {
+    const diags = lintQuadlet("# quadlet-lint-disable-next-line QL010\n\n[Instal]\n");
+    expect(diags.every((d) => d.code !== Codes.UNKNOWN_SECTION)).toBe(true);
+  });
+
+  it("still suppresses across an intervening ordinary comment", () => {
+    const diags = lintQuadlet(
+      "# quadlet-lint-disable-next-line QL010\n# just a note\n[Instal]\n",
+    );
+    expect(diags.every((d) => d.code !== Codes.UNKNOWN_SECTION)).toBe(true);
+  });
+
+  it("only suppresses the exact code named — other codes on that line still fire", () => {
+    const diags = lintQuadlet("# quadlet-lint-disable-next-line QL030\n[Instal]\n");
+    expect(diags.some((d) => d.code === Codes.UNKNOWN_SECTION)).toBe(true);
+  });
+
+  it("affects only the immediately following code line, not later ones", () => {
+    const diags = lintQuadlet(
+      "# quadlet-lint-disable-next-line QL010\n[Container]\n[Instal]\n",
+    );
+    const unknownSection = diags.find((d) => d.code === Codes.UNKNOWN_SECTION);
+    expect(unknownSection).toBeDefined();
+    expect(unknownSection?.line).toBe(3);
+  });
+
+  it("an ordinary comment suppresses nothing", () => {
+    const diags = lintQuadlet("# this is not a directive\n[Instal]\n");
+    expect(diags.some((d) => d.code === Codes.UNKNOWN_SECTION)).toBe(true);
+  });
+});
