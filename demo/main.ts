@@ -1,6 +1,11 @@
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import * as monaco from "monaco-editor";
-import { lintModel } from "../src/monaco.js";
+import {
+  lintModel,
+  registerCompletionProvider,
+  registerHoverProvider,
+  registerCodeActionProvider,
+} from "../src/monaco.js";
 
 self.MonacoEnvironment = {
   getWorker() {
@@ -23,6 +28,8 @@ Image=docker.io/library/nginx:1.27
 # QL030: unknown key (typo of Environment=)
 Enviroment=FOO=bar
 PublishPort=8080:80
+# QL040: value outside the documented closed set (Pull=)
+Pull=sometimes
 # QL001: not a Key=Value pair, a section, or a comment
 oops this line has no equals sign
 
@@ -31,12 +38,16 @@ oops this line has no equals sign
 WantedBy=multi-user.target
 `;
 
-const model = monaco.editor.createModel(sample, undefined, monaco.Uri.file("demo.container"));
+const model = monaco.editor.createModel(sample, "ini", monaco.Uri.file("demo.container"));
 
 monaco.editor.create(document.getElementById("editor")!, {
   model,
   automaticLayout: true,
 });
+
+registerCompletionProvider(monaco, "ini");
+registerHoverProvider(monaco, "ini");
+registerCodeActionProvider(monaco, "ini");
 
 lintModel(monaco, model);
 model.onDidChangeContent(() => lintModel(monaco, model));
