@@ -63,7 +63,7 @@ Both key rules are warnings, never errors, and both lean toward silence:
 
 ### Where the key data comes from
 
-The per-section key lists and their repeatability are **extracted from a vendored copy of the Podman man page** (`References/podman-systemd.unit.5.md`) into a committed data file, [`src/generated/keys.ts`](src/generated/keys.ts). This keeps the runtime dependency-free (no markdown parsing at load) and the data reviewable in git diffs.
+The per-section key lists and their repeatability are **extracted from a RedHat copy of the Podman man page** (`References/podman-systemd.unit.5.md`) into a committed data file, [`src/generated/keys.ts`](src/generated/keys.ts). This keeps the runtime dependency-free (no markdown parsing at load) and the data reviewable in git diffs.
 
 The canonical upstream source is:
 <https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html>
