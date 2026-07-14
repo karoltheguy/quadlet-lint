@@ -254,6 +254,73 @@ describe("QL040 enum values", () => {
   });
 });
 
+describe("QL050 section/file-type mismatch", () => {
+  /** Convenience: QL050 diagnostics present in a lint run. */
+  function ql050(text: string, fileName?: string): Diagnostic[] {
+    return lintQuadlet(text, fileName !== undefined ? { fileName } : undefined).filter(
+      (d) => d.code === "QL050",
+    );
+  }
+
+  it("flags a section that doesn't match the file's extension, plus missing-section", () => {
+    const diags = ql050("[Volume]\nVolumeName=v", "web.container");
+    expect(diags).toHaveLength(2);
+    expect(diags[0]).toMatchObject({
+      code: "QL050",
+      severity: "warning",
+      line: 1,
+      startColumn: 1,
+      endColumn: 9,
+    });
+    expect(diags[1]).toMatchObject({
+      code: "QL050",
+      severity: "error",
+      line: 1,
+      startColumn: 1,
+      endColumn: 9,
+    });
+  });
+
+  it("does not flag anything when there is no fileName", () => {
+    expect(ql050("[Volume]\nVolumeName=v")).toEqual([]);
+  });
+
+  it("does not flag a section that matches the file's extension", () => {
+    expect(ql050("[Container]\nImage=img", "web.container")).toEqual([]);
+  });
+
+  it("does not flag a drop-in that simply omits the expected section", () => {
+    expect(ql050("[Service]\nRestart=always", "web.container.d/10.conf")).toEqual([]);
+  });
+
+  it("flags a drop-in with the wrong Quadlet section, but no missing-section error", () => {
+    const diags = ql050("[Volume]\nVolumeName=v", "web.container.d/10.conf");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({ code: "QL050", severity: "warning" });
+  });
+
+  it("does not flag standard/exempt sections alongside a correct Quadlet section", () => {
+    const text = [
+      "[Container]",
+      "Image=img",
+      "",
+      "[Quadlet]",
+      "DefaultDependencies=false",
+      "",
+      "[Unit]",
+      "Description=x",
+      "",
+      "[X-Custom]",
+      "Foo=bar",
+    ].join("\n");
+    expect(ql050(text, "web.container")).toEqual([]);
+  });
+
+  it("does not flag anything when the fileName's extension is unresolvable", () => {
+    expect(ql050("[Volume]\nVolumeName=v", "notes.txt")).toEqual([]);
+  });
+});
+
 describe("diagnostics are ordered and well-formed", () => {
   it("returns results in source order with 1-based positions", () => {
     const text = "badline\n[Oops]\nImage=a\nImage=b";

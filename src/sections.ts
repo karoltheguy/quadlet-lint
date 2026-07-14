@@ -85,17 +85,51 @@ const EXTENSION_SECTIONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The Quadlet section a unit file's own extension implies, e.g. `web.container`
- * implies `[Container]`. Matching is case-sensitive on the extension after the
- * last `.` of the basename. Returns null for extensions we don't recognize or
- * names with no extension at all. Resolution of `.conf` drop-ins (which inherit
- * their target unit's section) is deliberately out of scope here and is handled
- * later by QL050.
+ * The Quadlet sections that are each tied to exactly one file type (i.e. the
+ * values of {@link EXTENSION_SECTIONS}). Unlike `QUADLET_SECTIONS`, this
+ * excludes sections such as `[Quadlet]` that are valid across every file
+ * type, so it's the right set to use when cross-checking a section header
+ * against the file's own extension.
  */
-export function expectedSectionFor(fileName: string): string | null {
-  const base = fileName.split("/").pop() ?? fileName;
+export const FILE_TYPE_SECTIONS: ReadonlySet<string> = new Set(Object.values(EXTENSION_SECTIONS));
+
+/**
+ * The Quadlet section a unit file's own extension implies, e.g. `web.container`
+ * implies `[Container]`, and whether that file is a drop-in (`.conf`) rather
+ * than a unit file proper. Matching is case-sensitive on the extension after
+ * the last `.` of the basename. Returns null for extensions we don't
+ * recognize or names with no extension at all.
+ *
+ * `.conf` files are drop-ins: systemd/Quadlet resolve their section from the
+ * immediate parent directory, not from the `.conf` extension itself. The
+ * parent must be exactly `<type>.d` or end with `.<type>.d` for one of the
+ * known Quadlet types (this matches `foo.container.d`, the dash-truncated
+ * `foo-.container.d`, the templated `foo@.container.d`, and a bare top-level
+ * `container.d`, while correctly rejecting a parent that merely ends with the
+ * type name, like `mycontainer.d`). A `.conf` with no matching parent returns
+ * null.
+ */
+export function expectedSectionFor(
+  fileName: string,
+): { section: string; isDropin: boolean } | null {
+  const segments = fileName.split("/");
+  const base = segments.pop() ?? fileName;
   const dot = base.lastIndexOf(".");
   if (dot === -1) return null;
   const ext = base.slice(dot + 1);
-  return EXTENSION_SECTIONS[ext] ?? null;
+
+  if (ext === "conf") {
+    const parent = segments.pop();
+    if (parent === undefined) return null;
+    for (const [type, section] of Object.entries(EXTENSION_SECTIONS)) {
+      const suffix = `${type}.d`;
+      if (parent === suffix || parent.endsWith(`.${suffix}`)) {
+        return { section, isDropin: true };
+      }
+    }
+    return null;
+  }
+
+  const section = EXTENSION_SECTIONS[ext];
+  return section !== undefined ? { section, isDropin: false } : null;
 }

@@ -12,11 +12,13 @@
 
 import {
   KNOWN_SECTIONS,
+  FILE_TYPE_SECTIONS,
   isUserDefinedSection,
   isSingleValueKey,
   isKnownKey,
   hasKeyData,
   getEnumValues,
+  expectedSectionFor,
 } from "./sections.js";
 
 export type Severity = "error" | "warning";
@@ -53,6 +55,11 @@ export const Codes = {
   UNKNOWN_KEY: "QL030",
   /** A value outside the curated closed set of allowed values for its key. */
   ENUM_VALUE: "QL040",
+  /**
+   * A file-specific Quadlet section that doesn't match the file's type, or
+   * the expected section missing entirely.
+   */
+  SECTION_FILE_MISMATCH: "QL050",
 } as const;
 
 /** A section header line, e.g. `[Container]`. */
@@ -62,13 +69,21 @@ const SECTION_RE = /^\s*\[(?<name>[^\]]*)\]\s*$/;
  * Lint Quadlet unit file text.
  *
  * @param text Full unit file contents.
- * @param options.fileName Optional source file name. Currently unused here;
- *   reserved for section-extension cross-checks (QL050).
+ * @param options.fileName Optional source file name, used to resolve the
+ *   section a `.container`/`.pod`/etc. file (or a `.conf` drop-in) is
+ *   expected to have, enabling the QL050 cross-checks.
  * @returns Diagnostics in source order (by line, then column).
  */
 export function lintQuadlet(text: string, options?: { fileName?: string }): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const lines = text.split(/\r?\n/);
+
+  // QL050 only activates when the caller supplies a fileName we can resolve
+  // to an expected section (a recognized Quadlet extension, or a `.conf`
+  // drop-in under a recognizable `<type>.d` directory). Without a fileName we
+  // have nothing to cross-check the sections against, so no QL050 is emitted.
+  const expected = options?.fileName !== undefined ? expectedSectionFor(options.fileName) : null;
+  let sawExpectedSection = false;
 
   /** Name of the section we are currently inside, or null before the first one. */
   let currentSection: string | null = null;
@@ -126,6 +141,28 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
               ? "Empty section name."
               : `Unknown section "[${name}]". This will be ignored — check for a typo or a wrong file type.`,
         });
+      }
+
+      // Cross-check against the file-type-specific section, if the caller
+      // gave us a fileName we could resolve one from. Standard systemd
+      // sections, [Quadlet] (valid across every file type), `X-` sections,
+      // and unknown sections are exempt because they are simply not members
+      // of FILE_TYPE_SECTIONS.
+      if (expected !== null && FILE_TYPE_SECTIONS.has(name)) {
+        if (name === expected.section) {
+          sawExpectedSection = true;
+        } else {
+          const start = raw.indexOf("[");
+          const end = raw.indexOf("]", start) + 1;
+          diagnostics.push({
+            line: lineNo,
+            startColumn: start + 1,
+            endColumn: end + 1,
+            severity: "warning",
+            code: Codes.SECTION_FILE_MISMATCH,
+            message: `Section "[${name}]" does not match this file type — a ${expected.section} file is handled through [${expected.section}]. This section will be ignored.`,
+          });
+        }
       }
 
       inContinuation = endsWithContinuation(raw);
@@ -229,6 +266,22 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
     }
 
     inContinuation = endsWithContinuation(raw);
+  }
+
+  // Mismatch above is a warning (the section is merely ignored, everything
+  // else in the file still works); a missing required section is an error,
+  // because Quadlet genuinely refuses to generate a service unit without it.
+  // Drop-ins are exempt: a `.conf` override legitimately contains only the
+  // keys it's overriding and never needs to repeat the main section.
+  if (expected !== null && !expected.isDropin && !sawExpectedSection) {
+    diagnostics.push({
+      line: 1,
+      startColumn: 1,
+      endColumn: Math.max(2, (lines[0]?.length ?? 0) + 1),
+      severity: "error",
+      code: Codes.SECTION_FILE_MISMATCH,
+      message: `Missing required [${expected.section}] section — Quadlet fails to generate a service without it.`,
+    });
   }
 
   return diagnostics;
