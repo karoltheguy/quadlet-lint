@@ -6,7 +6,16 @@
  */
 
 import { SECTION_RE, endsWithContinuation } from "./index.js";
-import { hasKeyData, isKnownKey, getKeyDescription } from "./sections.js";
+import {
+  hasKeyData,
+  isKnownKey,
+  getKeyDescription,
+  getSectionKeys,
+  getEnumValues,
+  KNOWN_SECTIONS,
+  FILE_TYPE_SECTIONS,
+  expectedSectionFor,
+} from "./sections.js";
 
 /**
  * A cursor/caret position. 1-based, matching {@link Diagnostic} in
@@ -107,6 +116,116 @@ export function getHover(text: string, position: Position): HoverInfo | null {
   }
 
   return null;
+}
+
+/**
+ * Compute completion suggestions at `position` in `text`. Depending on where
+ * the cursor sits, this suggests one of three things:
+ *
+ *  - Section headers, when the cursor is on an empty line with no enclosing
+ *    section yet, or right after an opened `[`. When `fileName` is given,
+ *    sections tied to a different file type (see {@link FILE_TYPE_SECTIONS})
+ *    are excluded.
+ *  - Keys, when the cursor is inside a section we have authoritative key
+ *    data for (see {@link hasKeyData}).
+ *  - Enum values, when the cursor is after a key's `=` and that key has a
+ *    curated closed-set of values (see {@link getEnumValues}).
+ *
+ * Returns `[]` on a continuation line, or when none of the above apply.
+ */
+export function getCompletions(
+  text: string,
+  position: Position,
+  fileName?: string,
+): CompletionItem[] {
+  const lines = text.split(/\r?\n/);
+  if (position.line < 1 || position.line > lines.length) return [];
+
+  const targetIndex = position.line - 1;
+
+  let currentSection: string | null = null;
+  let inContinuation = false;
+
+  for (let i = 0; i < targetIndex; i++) {
+    const raw = lines[i]!;
+
+    if (inContinuation) {
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    const trimmed = raw.trim();
+    if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+      continue;
+    }
+
+    const sectionMatch = SECTION_RE.exec(raw);
+    if (sectionMatch) {
+      currentSection = sectionMatch.groups!.name!;
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    const eq = raw.indexOf("=");
+    if (eq === -1) {
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    inContinuation = endsWithContinuation(raw);
+  }
+
+  if (inContinuation) return [];
+
+  const raw = lines[targetIndex] ?? "";
+  const beforeCursor = raw.slice(0, position.column - 1);
+  const trimmedBefore = beforeCursor.trim();
+
+  if (trimmedBefore === "") {
+    if (currentSection === null) return sectionCompletions(fileName);
+    if (hasKeyData(currentSection)) return keyCompletions(currentSection);
+    return [];
+  }
+
+  if (/^\[[^\]=]*$/.test(trimmedBefore)) {
+    return sectionCompletions(fileName);
+  }
+
+  const eq = beforeCursor.indexOf("=");
+  if (eq !== -1) {
+    const key = beforeCursor.slice(0, eq).trim();
+    if (currentSection === null) return [];
+    const values = getEnumValues(currentSection, key);
+    if (!values) return [];
+    return [...values].map((label) => ({ label }));
+  }
+
+  if (currentSection !== null && hasKeyData(currentSection)) {
+    return keyCompletions(currentSection);
+  }
+
+  return [];
+}
+
+function sectionCompletions(fileName?: string): CompletionItem[] {
+  let expected: string | null = null;
+  if (fileName) {
+    const exp = expectedSectionFor(fileName);
+    if (exp) expected = exp.section;
+  }
+
+  const items: CompletionItem[] = [];
+  for (const name of KNOWN_SECTIONS) {
+    if (expected !== null && FILE_TYPE_SECTIONS.has(name) && name !== expected) continue;
+    items.push({ label: name });
+  }
+  return items;
+}
+
+function keyCompletions(section: string): CompletionItem[] {
+  const keys = getSectionKeys(section);
+  if (!keys) return [];
+  return [...keys].map((label) => ({ label }));
 }
 
 export { lintQuadlet } from "./index.js";

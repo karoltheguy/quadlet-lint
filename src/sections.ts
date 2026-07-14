@@ -63,6 +63,14 @@ export function isSingleValueKey(section: string, key: string): boolean {
 }
 
 /**
+ * The set of documented valid keys for `section`, if we have authoritative
+ * key data for it (see {@link hasKeyData}). Returns undefined otherwise.
+ */
+export function getSectionKeys(section: string): ReadonlySet<string> | undefined {
+  return SECTION_KEYS[section]?.valid;
+}
+
+/**
  * The set of allowed values for `key` in `section`, if we have a curated
  * closed-set enum for it. Returns undefined when the key is free-form (or
  * simply not in our curated table), in which case no enum validation should

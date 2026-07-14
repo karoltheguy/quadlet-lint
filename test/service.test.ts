@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getHover, type HoverInfo } from "../src/service.js";
+import { getHover, getCompletions, type HoverInfo, type CompletionItem } from "../src/service.js";
 
 const ADD_HOST_DESCRIPTION = "Add host-to-IP mapping to /etc/hosts. The format is `hostname:ip`.";
 const IMAGE_DESCRIPTION =
@@ -109,5 +109,72 @@ describe("getHover", () => {
     const text = "[Container]\nAddHost=example:1.2.3.4\n";
     expect(() => getHover(text, { line: 99, column: 1 })).not.toThrow();
     expect(getHover(text, { line: 99, column: 1 })).toBeNull();
+  });
+});
+
+describe("getCompletions", () => {
+  function labels(items: CompletionItem[]): string[] {
+    return items.map((item) => item.label);
+  }
+
+  it("suggests section headers filtered by fileName", () => {
+    const text = "[";
+    const result = getCompletions(text, { line: 1, column: 2 }, "web.container");
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Container", "Unit", "Service", "Install", "Quadlet"]));
+    expect(found).not.toEqual(expect.arrayContaining(["Pod", "Network", "Volume", "Kube", "Build", "Image", "Artifact"]));
+  });
+
+  it("suggests all section headers when no fileName is given", () => {
+    const text = "[";
+    const result = getCompletions(text, { line: 1, column: 2 });
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Container", "Pod"]));
+  });
+
+  it("suggests section headers when there is no section yet", () => {
+    const text = "";
+    const result = getCompletions(text, { line: 1, column: 1 });
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Container", "Unit"]));
+    expect(found).not.toEqual(expect.arrayContaining(["Exec"]));
+  });
+
+  it("suggests keys within a known section", () => {
+    const text = "[Container]\n";
+    const result = getCompletions(text, { line: 2, column: 1 });
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Image", "Exec"]));
+    expect(found).not.toEqual(expect.arrayContaining(["Container"]));
+  });
+
+  it("returns no key completions in a standard systemd section", () => {
+    const text = "[Unit]\n";
+    const result = getCompletions(text, { line: 2, column: 1 });
+    expect(result).toEqual([]);
+  });
+
+  it("suggests enum values for a key with fixed options", () => {
+    const text = "[Container]\nPull=";
+    const result = getCompletions(text, { line: 2, column: 6 });
+    expect(labels(result).sort()).toEqual(["always", "missing", "never", "newer"]);
+  });
+
+  it("suggests enum values for a key with fixed options, mid-value", () => {
+    const text = "[Container]\nPull=alw";
+    const result = getCompletions(text, { line: 2, column: 9 });
+    expect(labels(result).sort()).toEqual(["always", "missing", "never", "newer"]);
+  });
+
+  it("returns no enum completions for a free-form key", () => {
+    const text = "[Container]\nImage=";
+    const result = getCompletions(text, { line: 2, column: 7 });
+    expect(result).toEqual([]);
+  });
+
+  it("returns no completions on a continuation line", () => {
+    const text = "[Container]\nExec=foo \\\n";
+    const result = getCompletions(text, { line: 3, column: 1 });
+    expect(result).toEqual([]);
   });
 });
