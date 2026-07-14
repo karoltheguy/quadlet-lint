@@ -236,13 +236,37 @@ export interface QuickFix {
 }
 
 /**
- * Compute quick fixes for `diagnostic` in `text`. Currently only handles
+ * Compute quick fixes for `diagnostic` in `text`. Handles
  * {@link Codes.UNKNOWN_KEY} (QL030): when the typo'd key has a close match
  * among the enclosing section's valid keys (see {@link findBestMatch}), this
- * returns a single fix that replaces the key with the match. Returns `[]`
- * for any other diagnostic code, or when no close match exists.
+ * returns a single fix that replaces the key with the match. Also handles
+ * {@link Codes.UNKNOWN_SECTION} (QL010): when the typo'd section name has a
+ * close match among {@link KNOWN_SECTIONS}, this returns a single fix that
+ * replaces the section header with the match. Returns `[]` for any other
+ * diagnostic code, or when no close match exists.
  */
 export function getQuickFixes(text: string, diagnostic: Diagnostic): QuickFix[] {
+  if (diagnostic.code === Codes.UNKNOWN_SECTION) {
+    const lines = text.split(/\r?\n/);
+    const token = lines[diagnostic.line - 1]!.slice(diagnostic.startColumn - 1, diagnostic.endColumn - 1); // "[name]"
+    const name = token.slice(1, -1); // strip the surrounding [ ]
+    const match = findBestMatch(name, KNOWN_SECTIONS);
+    if (match === null) return [];
+    return [
+      {
+        title: `Change to "[${match}]"`,
+        edits: [
+          {
+            line: diagnostic.line,
+            startColumn: diagnostic.startColumn,
+            endColumn: diagnostic.endColumn,
+            newText: `[${match}]`,
+          },
+        ],
+      },
+    ];
+  }
+
   if (diagnostic.code !== Codes.UNKNOWN_KEY) return [];
 
   const lines = text.split(/\r?\n/);

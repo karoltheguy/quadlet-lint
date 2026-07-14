@@ -211,12 +211,31 @@ describe("getQuickFixes", () => {
     expect(fixes).toEqual([]);
   });
 
-  it("returns no fixes for a non-QL030 diagnostic", () => {
-    const text = "[Nonexistent]\n";
+  it("returns no fixes for a diagnostic code it does not handle", () => {
+    const text = "not-a-valid-line\n";
     const diags = lintQuadlet(text);
-    const diag = diags.find((d: Diagnostic) => d.code !== "QL030");
+    const diag = diags.find((d: Diagnostic) => d.code !== "QL010" && d.code !== "QL030");
     expect(diag).toBeDefined();
     const fixes = getQuickFixes(text, diag as Diagnostic);
     expect(fixes).toEqual([]);
+  });
+
+  it("suggests a fix for a typo'd section name with a close match", () => {
+    const text = "[Instal]\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code === "QL010");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic);
+    expect(fixes).toEqual([
+      { title: 'Change to "[Install]"', edits: [{ line: 1, startColumn: 1, endColumn: 9, newText: "[Install]" }] },
+    ]);
+  });
+
+  it("returns no section fix when there is no close match", () => {
+    const text = "[Zzzzzzzzzz]\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code === "QL010");
+    expect(diag).toBeDefined();
+    expect(getQuickFixes(text, diag as Diagnostic)).toEqual([]);
   });
 });

@@ -136,6 +136,8 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
         // Flag the header itself (the `[...]` token).
         const start = raw.indexOf("[");
         const end = raw.indexOf("]", start) + 1;
+        const suggestion = findBestMatch(name, KNOWN_SECTIONS);
+        const suffix = suggestion !== null ? ` Did you mean "[${suggestion}]"?` : "";
         diagnostics.push({
           line: lineNo,
           startColumn: start + 1,
@@ -145,7 +147,7 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
           message:
             name === ""
               ? "Empty section name."
-              : `Unknown section "[${name}]". This will be ignored — check for a typo or a wrong file type.`,
+              : `Unknown section "[${name}]". This will be ignored — check for a typo or a wrong file type.${suffix}`,
         });
       }
 

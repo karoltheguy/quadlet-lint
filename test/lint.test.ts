@@ -113,6 +113,30 @@ describe("QL010 unknown section", () => {
   });
 });
 
+describe("QL010 did you mean", () => {
+  it("enriches the message with a suggestion when a close section match exists", () => {
+    const diags = lintQuadlet("[Instal]\n");
+    const diag = diags.find((d) => d.code === Codes.UNKNOWN_SECTION);
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('Did you mean "[Install]"?');
+  });
+
+  it("does not suggest for an empty section name", () => {
+    const diags = lintQuadlet("[]\n");
+    const diag = diags.find((d) => d.code === Codes.UNKNOWN_SECTION);
+    expect(diag).toBeDefined();
+    expect(diag?.message).toBe("Empty section name.");
+    expect(diag?.message).not.toContain("Did you mean");
+  });
+
+  it("does not suggest when no close section match exists", () => {
+    const diags = lintQuadlet("[Zzzzzzzzzz]\n");
+    const diag = diags.find((d) => d.code === Codes.UNKNOWN_SECTION);
+    expect(diag).toBeDefined();
+    expect(diag?.message).not.toContain("Did you mean");
+  });
+});
+
 describe("QL020 duplicate single-valued key", () => {
   it("flags a duplicated Image=", () => {
     const diags = lintQuadlet("[Container]\nImage=a\nImage=b");
