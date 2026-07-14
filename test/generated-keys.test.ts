@@ -43,3 +43,43 @@ describe("generated key data", () => {
     }
   });
 });
+
+describe("descriptions", () => {
+  it("every section has a descriptions object", () => {
+    for (const [section, entry] of Object.entries(SECTION_KEYS)) {
+      const descriptions = entry.descriptions;
+      expect(descriptions, `${section}.descriptions should exist`).toBeTypeOf("object");
+    }
+  });
+
+  it("Container.descriptions.Image is a non-empty string", () => {
+    const descriptions = SECTION_KEYS.Container!.descriptions;
+    expect(typeof descriptions["Image"]).toBe("string");
+    expect(descriptions["Image"]!.length).toBeGreaterThan(0);
+  });
+
+  it("Container.descriptions.Rootfs is a non-empty string", () => {
+    const descriptions = SECTION_KEYS.Container!.descriptions;
+    expect(typeof descriptions["Rootfs"]).toBe("string");
+    expect(descriptions["Rootfs"]!.length).toBeGreaterThan(0);
+  });
+
+  it("every description key is a member of the section's valid set", () => {
+    for (const [section, entry] of Object.entries(SECTION_KEYS)) {
+      const { valid, descriptions } = entry;
+      for (const k of Object.keys(descriptions)) {
+        expect(valid.has(k), `${section}.descriptions.${k} not in valid`).toBe(true);
+      }
+    }
+  });
+
+  it("descriptions are single paragraphs, not blank", () => {
+    for (const [section, entry] of Object.entries(SECTION_KEYS)) {
+      const { descriptions } = entry;
+      for (const [k, desc] of Object.entries(descriptions)) {
+        expect(desc.includes("\n\n"), `${section}.descriptions.${k} contains a blank line`).toBe(false);
+        expect(desc.trim().length, `${section}.descriptions.${k} is blank`).toBeGreaterThan(0);
+      }
+    }
+  });
+});

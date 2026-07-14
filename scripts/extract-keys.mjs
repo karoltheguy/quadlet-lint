@@ -62,8 +62,8 @@ function main() {
     if (m) return boundaries.push({ idx, kind: "detail", section: m[1] });
   });
 
-  /** section -> { valid:Set, singleValue:Set } */
-  const data = new Map(QUADLET_SECTIONS.map((s) => [s, { valid: new Set(), singleValue: new Set() }]));
+  /** section -> { valid:Set, singleValue:Set, descriptions:Map } */
+  const data = new Map(QUADLET_SECTIONS.map((s) => [s, { valid: new Set(), singleValue: new Set(), descriptions: new Map() }]));
 
   // 2. Each boundary owns the lines up to the next boundary.
   boundaries.forEach((b, i) => {
@@ -86,6 +86,8 @@ function main() {
         if (!currentKey) return;
         entry.valid.add(currentKey);
         if (!REPEATABLE.test(buf.join("\n"))) entry.singleValue.add(currentKey);
+        const desc = extractDescription(buf);
+        if (desc) entry.descriptions.set(currentKey, desc);
       };
       for (const line of region) {
         const m = DETAIL_KEY.exec(line);
@@ -104,10 +106,11 @@ function main() {
   // 3. Emit TypeScript.
   const today = new Date().toISOString().slice(0, 10);
   const body = QUADLET_SECTIONS.map((section) => {
-    const { valid, singleValue } = data.get(section);
+    const { valid, singleValue, descriptions } = data.get(section);
     return `  ${section}: {\n` +
       `    valid: new Set([${fmt([...valid])}]),\n` +
       `    singleValue: new Set([${fmt([...singleValue])}]),\n` +
+      `    descriptions: {\n${fmtDescriptions(descriptions)}\n    },\n` +
       `  },`;
   }).join("\n");
 
@@ -123,6 +126,9 @@ export interface SectionKeys {
   /** Keys proven single-valued (a duplicate is a mistake). Keys of unknown
    *  repeatability are intentionally omitted so they are never flagged. */
   singleValue: ReadonlySet<string>;
+  /** First doc paragraph per key, for hover. Keys documented only in the
+   *  "Valid options" table have no entry. */
+  descriptions: Readonly<Record<string, string>>;
 }
 
 /** Key data for the Quadlet-specific sections, keyed by section name. */
@@ -137,14 +143,41 @@ ${body}
   // Console summary for the human running the script.
   console.log(`Wrote ${OUT}`);
   for (const section of QUADLET_SECTIONS) {
-    const { valid, singleValue } = data.get(section);
-    console.log(`  [${section}] ${valid.size} keys, ${singleValue.size} single-valued`);
+    const { valid, singleValue, descriptions } = data.get(section);
+    console.log(`  [${section}] ${valid.size} keys, ${singleValue.size} single-valued, ${descriptions.size} described`);
   }
 }
 
 /** Quote a list of identifiers as TS string literals. */
 function fmt(items) {
   return items.map((s) => JSON.stringify(s)).join(", ");
+}
+
+/** Emit a descriptions map as `"Key": "text",` lines. */
+function fmtDescriptions(map) {
+  return [...map.entries()]
+    .map(([k, v]) => `      ${JSON.stringify(k)}: ${JSON.stringify(v)},`)
+    .join("\n");
+}
+
+/** A setext-heading underline artifact left over from the key's own header line. */
+const HEADING_UNDERLINE = /^-+$/;
+
+/**
+ * Derive a key's description from its raw detail block: skip leading empty
+ * lines (and the setext-heading underline immediately following the key
+ * header), then take lines up to (not including) the first empty line after
+ * prose starts, joined with a single space and trimmed.
+ */
+function extractDescription(buf) {
+  let i = 0;
+  while (i < buf.length && (buf[i].trim() === "" || HEADING_UNDERLINE.test(buf[i]))) i++;
+  const para = [];
+  while (i < buf.length && buf[i].trim() !== "") {
+    para.push(buf[i].trim());
+    i++;
+  }
+  return para.join(" ").trim();
 }
 
 main();
