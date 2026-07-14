@@ -45,6 +45,18 @@ model.onDidChangeContent(() => lintModel(monaco, model)); // ...and on every edi
 
 `lintModel` publishes results via `setModelMarkers(model, "quadlet-lint", …)`. If you want the markers without publishing them, use `toMarkers(monaco, lintQuadlet(text))`.
 
+Beyond markers, the adapter can register language providers for completions (sections, keys, and enum values), hover documentation, and quick fixes (e.g. rewriting a typo'd key). Providers register per language ID, so give your model a language (the built-in `ini` works well for unit files):
+
+```ts
+import { registerCompletionProvider, registerHoverProvider, registerCodeActionProvider } from "quadlet-lint/monaco";
+
+registerCompletionProvider(monaco, "ini");
+registerHoverProvider(monaco, "ini");
+registerCodeActionProvider(monaco, "ini");
+```
+
+Completions are file-type aware when the model's URI has a Quadlet extension (e.g. `web.container` won't suggest `[Pod]`).
+
 ## What it checks
 
 | Code    | Severity  | Rule |
