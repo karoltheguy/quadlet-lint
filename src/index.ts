@@ -18,8 +18,10 @@ import {
   isKnownKey,
   hasKeyData,
   getEnumValues,
+  getSectionKeys,
   expectedSectionFor,
 } from "./sections.js";
+import { findBestMatch } from "./levenshtein.js";
 
 export type Severity = "error" | "warning";
 
@@ -213,13 +215,15 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
     // open-ended. Kept a warning: the key list is a doc snapshot, so a newer
     // Podman key must never be reported as a hard error.
     if (hasKeyData(currentSection) && !isKnownKey(currentSection, key)) {
+      const suggestion = findBestMatch(key, getSectionKeys(currentSection) ?? []);
+      const suffix = suggestion !== null ? ` Did you mean "${suggestion}"?` : "";
       diagnostics.push({
         line: lineNo,
         startColumn: keyStart + 1,
         endColumn: keyStart + key.length + 1,
         severity: "warning",
         code: Codes.UNKNOWN_KEY,
-        message: `Unknown key "${key}" in [${currentSection}]. Check for a typo, or it may be from a newer Podman version.`,
+        message: `Unknown key "${key}" in [${currentSection}]. Check for a typo, or it may be from a newer Podman version.${suffix}`,
       });
     }
 

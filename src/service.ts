@@ -5,7 +5,7 @@
  * their own coordinate systems without pulling in an editor at all.
  */
 
-import { SECTION_RE, endsWithContinuation } from "./index.js";
+import { SECTION_RE, endsWithContinuation, Codes, type Diagnostic } from "./index.js";
 import {
   hasKeyData,
   isKnownKey,
@@ -16,6 +16,7 @@ import {
   FILE_TYPE_SECTIONS,
   expectedSectionFor,
 } from "./sections.js";
+import { findBestMatch } from "./levenshtein.js";
 
 /**
  * A cursor/caret position. 1-based, matching {@link Diagnostic} in
@@ -226,6 +227,80 @@ function keyCompletions(section: string): CompletionItem[] {
   const keys = getSectionKeys(section);
   if (!keys) return [];
   return [...keys].map((label) => ({ label }));
+}
+
+/** A single suggested fix for a diagnostic, expressed as a set of text edits. */
+export interface QuickFix {
+  title: string;
+  edits: TextEdit[];
+}
+
+/**
+ * Compute quick fixes for `diagnostic` in `text`. Currently only handles
+ * {@link Codes.UNKNOWN_KEY} (QL030): when the typo'd key has a close match
+ * among the enclosing section's valid keys (see {@link findBestMatch}), this
+ * returns a single fix that replaces the key with the match. Returns `[]`
+ * for any other diagnostic code, or when no close match exists.
+ */
+export function getQuickFixes(text: string, diagnostic: Diagnostic): QuickFix[] {
+  if (diagnostic.code !== Codes.UNKNOWN_KEY) return [];
+
+  const lines = text.split(/\r?\n/);
+
+  let currentSection: string | null = null;
+  let inContinuation = false;
+
+  for (let i = 0; i < diagnostic.line - 1; i++) {
+    const raw = lines[i]!;
+
+    if (inContinuation) {
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    const trimmed = raw.trim();
+    if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+      continue;
+    }
+
+    const sectionMatch = SECTION_RE.exec(raw);
+    if (sectionMatch) {
+      currentSection = sectionMatch.groups!.name!;
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    const eq = raw.indexOf("=");
+    if (eq === -1) {
+      inContinuation = endsWithContinuation(raw);
+      continue;
+    }
+
+    inContinuation = endsWithContinuation(raw);
+  }
+
+  if (currentSection === null) return [];
+
+  const keys = getSectionKeys(currentSection);
+  if (!keys) return [];
+
+  const key = lines[diagnostic.line - 1]!.slice(diagnostic.startColumn - 1, diagnostic.endColumn - 1);
+  const match = findBestMatch(key, keys);
+  if (match === null) return [];
+
+  return [
+    {
+      title: `Change to "${match}"`,
+      edits: [
+        {
+          line: diagnostic.line,
+          startColumn: diagnostic.startColumn,
+          endColumn: diagnostic.endColumn,
+          newText: match,
+        },
+      ],
+    },
+  ];
 }
 
 export { lintQuadlet } from "./index.js";

@@ -183,6 +183,25 @@ describe("QL030 unknown key", () => {
     const diags = lintQuadlet("[Bogus]\nWhatever=1");
     expect(diags.every((d) => d.code !== Codes.UNKNOWN_KEY)).toBe(true);
   });
+
+  it("enriches the message with a suggestion when a close match exists", () => {
+    const diags = lintQuadlet("[Container]\nImge=foo\n");
+    const diag = diags.find((d) => d.code === Codes.UNKNOWN_KEY);
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('Did you mean "Image"?');
+  });
+
+  it("still fires (unchanged position) but without a suggestion when there is no close match", () => {
+    const diags = lintQuadlet("[Container]\nZzzzzzzz=foo\n");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: Codes.UNKNOWN_KEY,
+      line: 2,
+      startColumn: 1,
+      endColumn: 9,
+    });
+    expect(diags[0]!.message).not.toContain("Did you mean");
+  });
 });
 
 describe("line continuations", () => {

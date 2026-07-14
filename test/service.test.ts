@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { getHover, getCompletions, type HoverInfo, type CompletionItem } from "../src/service.js";
+import {
+  getHover,
+  getCompletions,
+  getQuickFixes,
+  lintQuadlet,
+  type HoverInfo,
+  type CompletionItem,
+} from "../src/service.js";
+import type { Diagnostic } from "../src/index.js";
 
 const ADD_HOST_DESCRIPTION = "Add host-to-IP mapping to /etc/hosts. The format is `hostname:ip`.";
 const IMAGE_DESCRIPTION =
@@ -176,5 +184,39 @@ describe("getCompletions", () => {
     const text = "[Container]\nExec=foo \\\n";
     const result = getCompletions(text, { line: 3, column: 1 });
     expect(result).toEqual([]);
+  });
+});
+
+describe("getQuickFixes", () => {
+  it("suggests a fix for a typo'd key with a close match", () => {
+    const text = "[Container]\nImge=foo\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code === "QL030");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic);
+    expect(fixes).toEqual([
+      {
+        title: 'Change to "Image"',
+        edits: [{ line: 2, startColumn: 1, endColumn: 5, newText: "Image" }],
+      },
+    ]);
+  });
+
+  it("returns no fixes when there is no close match", () => {
+    const text = "[Container]\nZzzzzzzz=foo\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code === "QL030");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic);
+    expect(fixes).toEqual([]);
+  });
+
+  it("returns no fixes for a non-QL030 diagnostic", () => {
+    const text = "[Nonexistent]\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code !== "QL030");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic);
+    expect(fixes).toEqual([]);
   });
 });
