@@ -1,107 +1,143 @@
 #!/usr/bin/env node
 /**
- * Extract per-section key data from the vendored Podman Quadlet man page and
- * emit `src/generated/keys.ts`.
+ * Extract per-section key data from the live Podman Quadlet man page HTML
+ * and emit `src/generated/keys.ts`.
  *
  * Run with: `npm run gen:keys`
  *
- * Two facts are pulled per section:
- *   - `valid`:       every key documented for the section (the "Valid options
- *                    for [X]" table, unioned with any detailed key headers).
- *   - `singleValue`: keys we can prove are single-valued — i.e. they have a
- *                    detailed description block that does NOT say the key may be
- *                    repeated. Keys without a detailed block are left OUT (their
- *                    repeatability is unknown, so we must not flag duplicates).
- *
- * This conservative rule is what preserves the linter's "zero false errors"
- * promise: a key we can't prove is single-valued is simply never flagged.
- *
- * The output is committed so the runtime stays dependency-free; re-run this
- * whenever the vendored doc is updated.
+ * This script fetches the documentation HTML directly from docs.podman.io,
+ * parsing it to extract valid keys, single-valued/repeatable statuses,
+ * and description paragraphs. This eliminates any manual copy or conversion steps.
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import process from "node:process";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
-const DOC = join(ROOT, "References", "podman-systemd.unit.5.md");
 const OUT = join(ROOT, "src", "generated", "keys.ts");
 
-// Canonical upstream source of the vendored doc. Refresh References/ from here,
-// then re-run this script. Recorded in the generated file for provenance.
 const UPSTREAM = "https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html";
 
-// The nine Quadlet-specific sections. Order here defines output order.
-const QUADLET_SECTIONS = [
+export const QUADLET_SECTIONS = [
   "Container", "Pod", "Kube", "Network", "Volume",
   "Build", "Image", "Artifact", "Quadlet",
 ];
 
-/** A line that opens a "Valid options for `[X]` are listed below:" table. */
-const VALID_MARKER = /^Valid options for `\[(\w+)\]` are listed below:/;
-/** A line that opens a detailed "... `[X]` section are:" description block. */
-const DETAIL_MARKER = /^(?:Description of|Supported keys in).*`\[(\w+)\]`.*section are:/;
-/** A key row inside a "Valid options" table, e.g. `PublishPort=8080:80`. */
-const TABLE_KEY = /^([A-Z][A-Za-z0-9]+)=/;
-/** A key header inside a detailed block, e.g. `` `PublishPort=` ``. */
-const DETAIL_KEY = /^`([A-Za-z0-9]+)=`/;
-/** Wording that marks a key as repeatable (list/append semantics). */
 const REPEATABLE = /(?:listed|used|specified|set)\s+(?:multiple times|more than once|several times)|multiple times|more than once/i;
 
-function main() {
-  const lines = readFileSync(DOC, "utf8").split(/\r?\n/);
+export function cleanText(html) {
+  return html
+    // Convert code blocks / pre / span code structures with backticks
+    .replace(/<code[^>]*><span[^>]*>([\s\S]*?)<\/span><\/code>/gi, '`$1`')
+    .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`')
+    .replace(/<[^>]+>/g, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#8212;/g, '—')
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8220;/g, '“')
+    .replace(/&#8221;/g, '”')
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8230;/g, '...')
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  // 1. Collect all block boundaries in document order.
-  const boundaries = [];
-  lines.forEach((line, idx) => {
-    let m = VALID_MARKER.exec(line);
-    if (m) return boundaries.push({ idx, kind: "valid", section: m[1] });
-    m = DETAIL_MARKER.exec(line);
-    if (m) return boundaries.push({ idx, kind: "detail", section: m[1] });
-  });
-
-  /** section -> { valid:Set, singleValue:Set, descriptions:Map } */
+export function parseHtml(html) {
   const data = new Map(QUADLET_SECTIONS.map((s) => [s, { valid: new Set(), singleValue: new Set(), descriptions: new Map() }]));
 
-  // 2. Each boundary owns the lines up to the next boundary.
-  boundaries.forEach((b, i) => {
-    const start = b.idx + 1;
-    const end = i + 1 < boundaries.length ? boundaries[i + 1].idx : lines.length;
-    const region = lines.slice(start, end);
-    const entry = data.get(b.section);
-    if (!entry) throw new Error(`Doc names an unexpected section [${b.section}]`);
+  // 1. Locate boundaries using <h1> headings like "<h1>Build units [Build]"
+  const headingRegex = /<h1>.*?\[(\w+)\]/gi;
+  const boundaries = [];
+  let match;
+  while ((match = headingRegex.exec(html)) !== null) {
+    const section = match[1];
+    if (QUADLET_SECTIONS.includes(section)) {
+      boundaries.push({ index: match.index, section });
+    }
+  }
 
-    if (b.kind === "valid") {
-      for (const line of region) {
-        const m = TABLE_KEY.exec(line);
-        if (m) entry.valid.add(m[1]);
+  // Add the boundary for EXAMPLES or end of file to stop parsing the last section
+  const examplesMatch = /<section id="examples">/i.exec(html) || /<h1>EXAMPLES/i.exec(html);
+  const endOfDetailsIndex = examplesMatch ? examplesMatch.index : html.length;
+  boundaries.push({ index: endOfDetailsIndex, section: "END" });
+
+  // Sort boundaries by index
+  boundaries.sort((a, b) => a.index - b.index);
+
+  // Parse each section region
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const b = boundaries[i];
+    const nextB = boundaries[i + 1];
+    const section = b.section;
+    const entry = data.get(section);
+    if (!entry) continue;
+
+    const region = html.substring(b.index, nextB.index);
+
+    // A. Parse valid keys from the table in this region (if present)
+    const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+    let tableMatch;
+    if ((tableMatch = tableRegex.exec(region)) !== null) {
+      const tableBody = tableMatch[1];
+      const keyRegex = /<td><p>([A-Za-z0-9]+)=/gi;
+      let keyMatch;
+      while ((keyMatch = keyRegex.exec(tableBody)) !== null) {
+        entry.valid.add(keyMatch[1]);
       }
-    } else {
-      // Split the detail region into per-key blocks and test each for repeat wording.
-      let currentKey = null;
-      let buf = [];
-      const flush = () => {
-        if (!currentKey) return;
-        entry.valid.add(currentKey);
-        if (!REPEATABLE.test(buf.join("\n"))) entry.singleValue.add(currentKey);
-        const desc = extractDescription(buf);
-        if (desc) entry.descriptions.set(currentKey, desc);
-      };
-      for (const line of region) {
-        const m = DETAIL_KEY.exec(line);
-        if (m) {
-          flush();
-          currentKey = m[1];
-          buf = [];
-        } else if (currentKey) {
-          buf.push(line);
+    }
+
+    // B. Parse detailed keys in this region
+    const keyHeadingRegex = /<h2><code[^>]*><span[^>]*>([A-Za-z0-9]+)=<\/span><\/code>/gi;
+    const keyBoundaries = [];
+    let keyMatch;
+    while ((keyMatch = keyHeadingRegex.exec(region)) !== null) {
+      keyBoundaries.push({ index: keyMatch.index, key: keyMatch[1] });
+    }
+    keyBoundaries.push({ index: region.length, key: "END" });
+
+    for (let j = 0; j < keyBoundaries.length - 1; j++) {
+      const kb = keyBoundaries[j];
+      const nextKb = keyBoundaries[j + 1];
+      const key = kb.key;
+      const keyRegion = region.substring(kb.index, nextKb.index);
+
+      // Add to valid
+      entry.valid.add(key);
+
+      // Extract first paragraph after the h2 tag for description
+      const pMatch = /<p>([\s\S]*?)<\/p>/i.exec(keyRegion.substring(keyRegion.indexOf("</h2>")));
+      if (pMatch) {
+        const descText = cleanText(pMatch[1]);
+        if (descText) {
+          entry.descriptions.set(key, descText);
         }
       }
-      flush();
+
+      // Check repeatability
+      const cleanRegionText = cleanText(keyRegion);
+      if (!REPEATABLE.test(cleanRegionText)) {
+        entry.singleValue.add(key);
+      }
     }
-  });
+  }
+
+  return data;
+}
+
+export async function main() {
+  console.log(`Fetching upstream reference: ${UPSTREAM}`);
+  const res = await fetch(UPSTREAM);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${UPSTREAM}: ${res.statusText}`);
+  }
+  const html = await res.text();
+  const data = parseHtml(html);
 
   // 3. Emit TypeScript.
   const today = new Date().toISOString().slice(0, 10);
@@ -115,9 +151,8 @@ function main() {
   }).join("\n");
 
   const out = `// AUTO-GENERATED — do not edit by hand.
-// Source: References/podman-systemd.unit.5.md
-// Upstream: ${UPSTREAM}
-// Regenerate with: npm run gen:keys (after refreshing References/ from upstream)
+// Source: ${UPSTREAM}
+// Regenerate with: npm run gen:keys
 // Generated: ${today}
 
 export interface SectionKeys {
@@ -149,35 +184,22 @@ ${body}
 }
 
 /** Quote a list of identifiers as TS string literals. */
-function fmt(items) {
+export function fmt(items) {
   return items.map((s) => JSON.stringify(s)).join(", ");
 }
 
 /** Emit a descriptions map as `"Key": "text",` lines. */
-function fmtDescriptions(map) {
+export function fmtDescriptions(map) {
   return [...map.entries()]
     .map(([k, v]) => `      ${JSON.stringify(k)}: ${JSON.stringify(v)},`)
     .join("\n");
 }
 
-/** A setext-heading underline artifact left over from the key's own header line. */
-const HEADING_UNDERLINE = /^-+$/;
-
-/**
- * Derive a key's description from its raw detail block: skip leading empty
- * lines (and the setext-heading underline immediately following the key
- * header), then take lines up to (not including) the first empty line after
- * prose starts, joined with a single space and trimmed.
- */
-function extractDescription(buf) {
-  let i = 0;
-  while (i < buf.length && (buf[i].trim() === "" || HEADING_UNDERLINE.test(buf[i]))) i++;
-  const para = [];
-  while (i < buf.length && buf[i].trim() !== "") {
-    para.push(buf[i].trim());
-    i++;
-  }
-  return para.join(" ").trim();
+// Run main if this file is the main entry point
+const nodePath = process.argv[1];
+if (nodePath && (nodePath === fileURLToPath(import.meta.url) || nodePath.endsWith("extract-keys.mjs"))) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
-
-main();

@@ -36,13 +36,13 @@ describe("getHover", () => {
     expect(result).toEqual(expected);
   });
 
-  it("returns a null description for a valid key documented only in the 'Valid options' table (Build/Arch)", () => {
+  it("returns hover info for a Build key with description (Build/Arch)", () => {
     const text = "[Build]\nArch=amd64\n";
     const result = getHover(text, { line: 2, column: 2 });
     const expected: HoverInfo = {
       section: "Build",
       key: "Arch",
-      description: null,
+      description: "Override the architecture, defaults to hosts’, of the image to be built.",
     };
     expect(result).toEqual(expected);
   });
