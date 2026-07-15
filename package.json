@@ -46,7 +46,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "vite demo",
-    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build",
+    "package:vscode": "npm --prefix extensions/vscode run build && cd extensions/vscode && npx @vscode/vsce package --no-dependencies"
   },
   "peerDependencies": {
     "monaco-editor": ">=0.34.0"

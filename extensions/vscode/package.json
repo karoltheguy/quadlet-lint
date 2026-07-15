@@ -2,6 +2,18 @@
   "name": "quadlet-lint-vscode",
   "private": true,
   "version": "0.0.1",
+  "publisher": "karoltheguy",
+  "displayName": "Quadlet Lint",
+  "description": "Linting, completions, hover documentation, and quick fixes for Podman Quadlet unit files.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/karoltheguy/quadlet-lint"
+  },
+  "license": "MIT",
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
   "type": "module",
   "engines": {
     "vscode": "^1.90.0"
