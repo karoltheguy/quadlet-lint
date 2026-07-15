@@ -9,6 +9,23 @@
 
 import * as vscode from "vscode";
 import { refreshDiagnostics } from "./diagnostics.js";
+import {
+  createCompletionProvider,
+  createHoverProvider,
+  createCodeActionProvider,
+  type VscodeLike,
+} from "./providers.js";
+
+/**
+ * The real `vscode` namespace's shapes for `CompletionItem`, `Hover`, and
+ * `CodeAction` are wider than the minimal {@link VscodeLike} contract the
+ * providers are tested against (e.g. `CompletionItem`'s label accepts a
+ * `CompletionItemLabel` in addition to a plain string). Narrowing the
+ * namespace to `VscodeLike` — and widening the resulting provider back to
+ * the real `vscode` provider interfaces — bridges that gap without loosening
+ * the DI contract the unit tests rely on.
+ */
+const vscodeNs = vscode as unknown as VscodeLike;
 
 const QUADLET_LANGUAGE_ID = "quadlet";
 
@@ -42,6 +59,28 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidCloseTextDocument((document) => {
       collection.delete(document.uri);
     }),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      QUADLET_LANGUAGE_ID,
+      createCompletionProvider(vscodeNs) as vscode.CompletionItemProvider,
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider(
+      QUADLET_LANGUAGE_ID,
+      createHoverProvider(vscodeNs) as vscode.HoverProvider,
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      QUADLET_LANGUAGE_ID,
+      createCodeActionProvider(vscodeNs) as unknown as vscode.CodeActionProvider,
+      { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
+    ),
   );
 }
 
