@@ -1,0 +1,40 @@
+{
+  "name": "quadlet-lint-vscode",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onLanguage:quadlet"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "quadlet",
+        "aliases": [
+          "Quadlet"
+        ],
+        "extensions": [
+          ".container",
+          ".pod",
+          ".network",
+          ".volume",
+          ".kube",
+          ".build",
+          ".image",
+          ".artifact"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0"
+  }
+}
