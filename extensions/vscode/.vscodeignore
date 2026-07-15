@@ -1,0 +1,5 @@
+.gitignore
+tsconfig.json
+build.mjs
+src/**
+node_modules/**
