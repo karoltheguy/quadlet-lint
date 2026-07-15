@@ -29,8 +29,11 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm run test
+      - name: Run tests with coverage
+        run: |
+          VITEST_VERSION=$(node -p "require('vitest/package.json').version")
+          npm install --no-save "@vitest/coverage-v8@$VITEST_VERSION"
+          npx vitest run --coverage
 
       - name: Build Core, Monaco, and CLI
         run: npm run build
