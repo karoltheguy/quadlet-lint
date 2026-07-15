@@ -1,5 +1,8 @@
 # quadlet-lint
 
+[![Build and Test](https://github.com/karoltheguy/quadlet-lint/actions/workflows/build.yml/badge.svg)](https://github.com/karoltheguy/quadlet-lint/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/karoltheguy/quadlet-lint/graph/badge.svg)](https://codecov.io/gh/karoltheguy/quadlet-lint)
+
 Fast, dependency-free linting for Podman [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) unit files (`.container`, `.pod`, `.network`, `.volume`, `.kube`, `.build`, `.image`), with an adapter for the [Monaco Editor](https://microsoft.github.io/monaco-editor/) (and, on the roadmap, VS Code).
 
 Quadlet files are systemd units, and the authoritative check will always be `podman system generate --dryrun`. But the generator needs Podman on the host and a round-trip. **quadlet-lint gives instant, as-you-type feedback for the mistakes that don't need Podman to detect** — and nothing else.
