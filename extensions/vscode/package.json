@@ -26,7 +26,15 @@
           ".build",
           ".image",
           ".artifact"
-        ]
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "quadlet",
+        "scopeName": "source.quadlet",
+        "path": "./syntaxes/quadlet.tmLanguage.json"
       }
     ]
   },

@@ -57,6 +57,7 @@
     }
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "monaco-editor": "^0.52.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",

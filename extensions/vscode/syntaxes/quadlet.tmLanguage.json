@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Quadlet",
+  "scopeName": "source.quadlet",
+  "patterns": [
+    {
+      "include": "#comment-hash"
+    },
+    {
+      "include": "#comment-semicolon"
+    },
+    {
+      "include": "#sections"
+    },
+    {
+      "include": "#keyvalue"
+    }
+  ],
+  "repository": {
+    "comment-hash": {
+      "name": "comment.line.number-sign.quadlet",
+      "match": "^\\s*#.*$"
+    },
+    "comment-semicolon": {
+      "name": "comment.line.semicolon.quadlet",
+      "match": "^\\s*;.*$"
+    },
+    "sections": {
+      "name": "entity.name.section.quadlet",
+      "match": "^\\s*(\\[)([A-Za-z0-9][A-Za-z0-9-]*)(\\])\\s*$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.section.begin.quadlet"
+        },
+        "2": {
+          "name": "entity.name.section.quadlet"
+        },
+        "3": {
+          "name": "punctuation.definition.section.end.quadlet"
+        }
+      }
+    },
+    "keyvalue": {
+      "match": "^\\s*([A-Za-z][A-Za-z0-9_-]*)(=)(.*)$",
+      "captures": {
+        "1": {
+          "name": "keyword.other.key.quadlet"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.quadlet"
+        },
+        "3": {
+          "name": "string.unquoted.quadlet"
+        }
+      }
+    },
+    "line-continuation": {
+      "name": "constant.character.escape.line-continuation.quadlet",
+      "match": "\\\\$"
+    }
+  }
+}
