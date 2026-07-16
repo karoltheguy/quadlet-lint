@@ -19,6 +19,7 @@ import {
   hasKeyData,
   getEnumValues,
   getSectionKeys,
+  getConflictingKeys,
   expectedSectionFor,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
@@ -62,6 +63,8 @@ export const Codes = {
    * the expected section missing entirely.
    */
   SECTION_FILE_MISMATCH: "QL050",
+  /** Two keys in the same section that Quadlet's generator refuses to accept together. */
+  CONFLICTING_KEYS: "QL070",
 } as const;
 
 /**
@@ -105,6 +108,24 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
    */
   let seenKeys = new Map<string, number>();
   /**
+   * Keys already seen in the current section that participate in a curated
+   * conflict pair (see {@link getConflictingKeys}) AND currently have a
+   * non-empty (trimmed) value, mapped to the line where that value was set.
+   * A key with an empty or whitespace-only value is not "set" as far as
+   * Quadlet's generator is concerned (it gates on `len(value) > 0`), so an
+   * empty assignment removes any prior entry rather than merely skipping it,
+   * which gives correct last-wins behavior for single-valued keys. Reset on
+   * each new section header, kept separate from `seenKeys` so conflict
+   * detection does not depend on a key also being classified as single-valued.
+   */
+  let seenConflictKeys = new Map<string, number>();
+  /**
+   * Conflict pairs already reported in the current section, canonicalized as
+   * `${a}|${b}` with the two key names sorted. Ensures at most one QL070
+   * diagnostic per pair per section even if one side of the pair repeats.
+   */
+  let reportedConflictPairs = new Set<string>();
+  /**
    * When a value line ends with a backslash it continues onto the next
    * physical line(s). Those continuation lines are part of the value and must
    * not be classified as their own statements.
@@ -142,6 +163,8 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
       const name = sectionMatch.groups!.name!;
       currentSection = name;
       seenKeys = new Map();
+      seenConflictKeys = new Map();
+      reportedConflictPairs = new Set();
 
       const known = KNOWN_SECTIONS.has(name) || isUserDefinedSection(name);
       if (!known) {
@@ -284,6 +307,51 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
         });
       } else {
         seenKeys.set(key, lineNo);
+      }
+    }
+
+    // Mutually-exclusive key detection, restricted to the curated conflict
+    // table. Unlike DUPLICATE_KEY above, this is a hard error: both cited
+    // Podman source lines make ConvertContainer return a nil unit file, so
+    // generation genuinely fails when both keys of a pair are set. Podman's
+    // generator itself only treats a key as "set" when its value is
+    // non-empty (e.g. `len(image) > 0 && len(rootfs) > 0`), so we mirror
+    // that here rather than firing on key presence alone.
+    const conflictPartners = getConflictingKeys(currentSection, key);
+    if (conflictPartners.length > 0) {
+      // A value ending in a backslash continues onto the next physical
+      // line(s), so it is never empty regardless of what follows the `=`
+      // on this line.
+      const isContinued = endsWithContinuation(raw);
+      const value = raw.slice(eq + 1).trim();
+      const isSet = isContinued || value !== "";
+
+      if (isSet) {
+        for (const partner of conflictPartners) {
+          const firstLine = seenConflictKeys.get(partner);
+          if (firstLine !== undefined) {
+            const pairId = [key, partner].sort().join("|");
+            if (!reportedConflictPairs.has(pairId)) {
+              reportedConflictPairs.add(pairId);
+              diagnostics.push({
+                line: lineNo,
+                startColumn: keyStart + 1,
+                endColumn: keyStart + key.length + 1,
+                severity: "error",
+                code: Codes.CONFLICTING_KEYS,
+                message: `Key "${key}" conflicts with "${partner}" (set on line ${firstLine}) — Quadlet fails to generate a service when both are set in [${currentSection}].`,
+              });
+            }
+          }
+        }
+        if (!seenConflictKeys.has(key)) {
+          seenConflictKeys.set(key, lineNo);
+        }
+      } else {
+        // Empty (or whitespace-only) value: systemd is last-wins for
+        // single-valued keys, so this genuinely unsets any earlier value.
+        // Remove the prior entry rather than merely skipping the update.
+        seenConflictKeys.delete(key);
       }
     }
 

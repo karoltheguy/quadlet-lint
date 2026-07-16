@@ -12,6 +12,7 @@
 
 import { SECTION_KEYS } from "./generated/keys.js";
 import { SECTION_ENUMS } from "./enums.js";
+import { SECTION_CONFLICTS } from "./conflicts.js";
 
 /** Standard systemd sections, valid in any unit file. */
 const SYSTEMD_SECTIONS = ["Unit", "Service", "Install"] as const;
@@ -78,6 +79,24 @@ export function getSectionKeys(section: string): ReadonlySet<string> | undefined
  */
 export function getEnumValues(section: string, key: string): ReadonlySet<string> | undefined {
   return SECTION_ENUMS[section]?.[key];
+}
+
+/**
+ * The other key(s) in `section` that are documented as mutually exclusive
+ * with `key` (see {@link SECTION_CONFLICTS}). Returns an empty array when the
+ * key participates in no curated conflict, in which case no conflict
+ * validation should be attempted.
+ */
+export function getConflictingKeys(section: string, key: string): readonly string[] {
+  const pairs = SECTION_CONFLICTS[section];
+  if (pairs === undefined) return [];
+  const partners: string[] = [];
+  for (const pair of pairs) {
+    const [a, b] = pair.keys;
+    if (a === key) partners.push(b);
+    else if (b === key) partners.push(a);
+  }
+  return partners;
 }
 
 /**

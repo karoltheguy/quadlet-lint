@@ -364,6 +364,115 @@ describe("QL050 section/file-type mismatch", () => {
   });
 });
 
+describe("QL070 conflicting / mutually exclusive keys", () => {
+  /** Convenience: QL070 diagnostics present in a lint run. */
+  function ql070(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === Codes.CONFLICTING_KEYS);
+  }
+
+  it("flags Image= and Rootfs= together, on the second key's line", () => {
+    const text = [
+      "[Container]",
+      "Image=docker.io/library/nginx:latest",
+      "Rootfs=/var/lib/rootfs",
+    ].join("\n");
+    const diags = ql070(text);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: Codes.CONFLICTING_KEYS,
+      severity: "error",
+      line: 3,
+      startColumn: 1,
+      endColumn: 7,
+    });
+    expect(diags[0]!.message).toContain("Image");
+    expect(diags[0]!.message).toContain("Rootfs");
+    expect(diags[0]!.message).toContain("line 2");
+  });
+
+  it("flags ReloadCmd= and ReloadSignal= together, on the second key's line", () => {
+    const text = ["[Container]", "ReloadCmd=/bin/reload.sh", "ReloadSignal=SIGHUP"].join("\n");
+    const diags = ql070(text);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: Codes.CONFLICTING_KEYS,
+      severity: "error",
+      line: 3,
+    });
+    expect(diags[0]!.message).toContain("ReloadCmd");
+    expect(diags[0]!.message).toContain("ReloadSignal");
+  });
+
+  it("flags the pair regardless of order, reporting on whichever key comes second", () => {
+    const text = [
+      "[Container]",
+      "Rootfs=/var/lib/rootfs",
+      "Image=docker.io/library/nginx:latest",
+    ].join("\n");
+    const diags = ql070(text);
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: Codes.CONFLICTING_KEYS,
+      severity: "error",
+      line: 3,
+    });
+    expect(diags[0]!.message).toContain("line 2");
+  });
+
+  it("does not flag Image= alone", () => {
+    expect(ql070("[Container]\nImage=docker.io/library/nginx:latest")).toEqual([]);
+  });
+
+  it("does not flag Rootfs= alone", () => {
+    expect(ql070("[Container]\nRootfs=/var/lib/rootfs")).toEqual([]);
+  });
+
+  it("is suppressed by a disable-next-line comment above the second key", () => {
+    const text = [
+      "[Container]",
+      "Image=docker.io/library/nginx:latest",
+      "# quadlet-lint-disable-next-line QL070",
+      "Rootfs=/var/lib/rootfs",
+    ].join("\n");
+    expect(ql070(text)).toEqual([]);
+  });
+
+  it("does not flag an empty Image= paired with a non-empty Rootfs=", () => {
+    const text = ["[Container]", "Image=", "Rootfs=/var/lib/rootfs"].join("\n");
+    expect(ql070(text)).toEqual([]);
+  });
+
+  it("does not flag a non-empty Image= paired with an empty Rootfs=", () => {
+    const text = [
+      "[Container]",
+      "Image=docker.io/library/nginx:latest",
+      "Rootfs=",
+    ].join("\n");
+    expect(ql070(text)).toEqual([]);
+  });
+
+  it("does not flag an empty ReloadCmd= paired with a non-empty ReloadSignal=", () => {
+    const text = ["[Container]", "ReloadCmd=", "ReloadSignal=HUP"].join("\n");
+    expect(ql070(text)).toEqual([]);
+  });
+
+  it("does not flag a whitespace-only Image= paired with a non-empty Rootfs=", () => {
+    const text = ["[Container]", "Image=   ", "Rootfs=/var/lib/rootfs"].join("\n");
+    expect(ql070(text)).toEqual([]);
+  });
+
+  it("does not flag when a later empty Image= assignment resets an earlier non-empty one (last-wins)", () => {
+    const text = [
+      "[Container]",
+      "Image=docker.io/library/nginx:latest",
+      "Image=",
+      "Rootfs=/var/lib/rootfs",
+    ].join("\n");
+    // A QL020 duplicate-key warning is expected here; only QL070 is under test.
+    expect(ql070(text)).toEqual([]);
+  });
+});
+
 describe("diagnostics are ordered and well-formed", () => {
   it("returns results in source order with 1-based positions", () => {
     const text = "badline\n[Oops]\nImage=a\nImage=b";

@@ -129,6 +129,7 @@ Positions are the same `{ line, column }` used elsewhere.
 | `QL030` | warning   | A key that is **not documented for its section** (a typo, or an option from a newer Podman than this build knows). Only Quadlet-specific sections are checked. |
 | `QL040` | warning   | A value outside the **known closed value set** for its key (e.g. `Pull=sometimes`), from a small hand-curated enum table. Values compare case-insensitively. |
 | `QL050` | warning / error | Only when a `fileName` is passed: a file-type-specific section that doesn't match the file's type (warning, since the section is simply ignored), or the expected section missing entirely (error, since Quadlet then fails to generate a service). Drop-in `.conf` files are recognized via their `<type>.d` parent directory and are exempt from the missing-section error. |
+| `QL070` | error     | Two keys in the same section that Quadlet's generator refuses to accept together (`Image=`/`Rootfs=` and `ReloadCmd=`/`ReloadSignal=` in `[Container]`), from a small hand-curated conflict table. A key with an empty value doesn't count as set. |
 | `QL0X0` | xx | more codes to come.
 
 
@@ -136,12 +137,13 @@ Diagnostic codes are exported as `Codes` for programmatic use.
 
 ### Why key checks are conservative
 
-The key and value rules are warnings, never errors, and all lean toward silence:
+The key and value rules all lean toward silence, and stay warnings unless the failure is provable. An `error` is reserved for what Quadlet itself demonstrably refuses to generate:
 
 - For **`QL020` (duplicates)**, many Quadlet keys legitimately repeat and accumulate (`Volume=`, `PublishPort=`, `Environment=`, `Label=`, `AddCapability=`, …). Flagging every duplicate would produce constant false positives, so `QL020` fires *only* for keys the docs prove are single-valued. A key of unknown repeatability is never flagged.
 - **`QL030` (unknown keys)** is checked only for the Quadlet-specific sections (`[Container]`, `[Pod]`, …), where the man page gives an authoritative key list. The open-ended standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) and `X-` sections are never key-checked. It stays a warning because the key list is a doc snapshot, so a key from a newer Podman must never be reported as a hard error.
 - **`QL040` (enum values)** is checked only for keys in a hand-curated, source-cited table (`src/enums.ts`) whose value sets are provably closed (e.g. `Pull=`, `ExitPolicy=`, documented booleans, including the `1`/`0` spellings). Keys with open or pattern-shaped value sets (`Notify=`, `AutoUpdate=`) are deliberately omitted, and values containing interpolation (`$`, `%`, backticks, `{{`) or spanning continuation lines are never judged. Omission is always the safe default.
 - **`QL050` (section ↔ file type)** needs an explicit `fileName` option to activate at all, and file-name matching is case-sensitive, exactly as Quadlet's own is (a wrongly-cased extension means Quadlet ignores the file, so it must produce no diagnostics). The type-agnostic `[Quadlet]` section, the standard systemd sections, and `X-` sections are never cross-checked, and drop-ins legitimately omit the main section, so only their *mismatched* sections warn.
+- **`QL070` (conflicting keys)** is checked only against a hand-curated, source-cited pair table (`src/conflicts.ts`); omission is the safe default, exactly as with `QL040`. Unlike the rules above, it's one of the few that fires as an `error` rather than a `warning`, justified because Quadlet's generator genuinely returns an error and produces no unit at all when both keys of a pair are set, rather than a doc-snapshot-derived guess about what might be wrong. A key with an empty or whitespace-only value doesn't count as "set", matching the generator's own `len(...) > 0` check, so `Image=` followed by `Rootfs=/path` is correctly left unflagged.
 
 ### Where the key data comes from
 
