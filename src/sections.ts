@@ -13,6 +13,12 @@
 import { SECTION_KEYS } from "./generated/keys.js";
 import { SECTION_ENUMS } from "./enums.js";
 import { SECTION_CONFLICTS } from "./conflicts.js";
+import {
+  SECTION_REQUIRED,
+  SECTION_CONDITIONAL,
+  type SectionRequirements,
+  type ConditionalRequirement,
+} from "./required.js";
 
 /** Standard systemd sections, valid in any unit file. */
 const SYSTEMD_SECTIONS = ["Unit", "Service", "Install"] as const;
@@ -97,6 +103,24 @@ export function getConflictingKeys(section: string, key: string): readonly strin
     else if (b === key) partners.push(a);
   }
   return partners;
+}
+
+/**
+ * The curated required-key rules for `section` (see {@link SECTION_REQUIRED}),
+ * if any. Returns undefined when the section has no curated requirements, in
+ * which case no QL060 validation should be attempted for it.
+ */
+export function getSectionRequirements(section: string): SectionRequirements | undefined {
+  return SECTION_REQUIRED[section];
+}
+
+/**
+ * The curated conditional requirements for `section` (see
+ * {@link SECTION_CONDITIONAL}). Returns an empty array when the section has
+ * none, in which case no QL061 validation should be attempted for it.
+ */
+export function getConditionalRequirements(section: string): readonly ConditionalRequirement[] {
+  return SECTION_CONDITIONAL[section] ?? [];
 }
 
 /**

@@ -81,7 +81,11 @@ describe("expectedSectionFor", () => {
 
 describe("lintQuadlet with fileName option", () => {
   it("accepts an optional { fileName } second argument matching the content, with no QL050", () => {
-    const text = "[Container]\nImagee=x";
+    // A complete unit: the fileName-gated rules (QL050 missing-section,
+    // QL060 required keys) have nothing to report, so passing a fileName
+    // must not change the diagnostics. The typo sits on a non-required key
+    // so QL030 is still exercised on both paths.
+    const text = "[Container]\nImage=docker.io/library/nginx:latest\nPublishPortt=8080:80";
     const withFileName = lintQuadlet(text, { fileName: "web.container" });
     expect(withFileName).toEqual(lintQuadlet(text));
     expect(withFileName.every((d) => d.code !== "QL050")).toBe(true);

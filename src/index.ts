@@ -20,6 +20,8 @@ import {
   getEnumValues,
   getSectionKeys,
   getConflictingKeys,
+  getSectionRequirements,
+  getConditionalRequirements,
   expectedSectionFor,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
@@ -63,6 +65,10 @@ export const Codes = {
    * the expected section missing entirely.
    */
   SECTION_FILE_MISMATCH: "QL050",
+  /** A required key, or required one-of group, missing from the file's own expected section. */
+  REQUIRED_KEY_MISSING: "QL060",
+  /** A conditional requirement (one key implies another) that is unmet. */
+  CONDITIONAL_REQUIREMENT: "QL061",
   /** Two keys in the same section that Quadlet's generator refuses to accept together. */
   CONFLICTING_KEYS: "QL070",
 } as const;
@@ -126,6 +132,22 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
    */
   let reportedConflictPairs = new Set<string>();
   /**
+   * QL060/QL061 bookkeeping, populated only while `currentSection` equals
+   * `expected.section` (the file's own expected section). `reqLastValue` and
+   * `reqLastNonEmpty` are last-wins per key, mirroring `seenConflictKeys`: a
+   * later empty assignment unsets a key's non-empty status. `reqSeenEver` is
+   * never removed once a key has been assigned any value, including an empty
+   * one, because Podman's presence-only checks (e.g. Volume's `Image=` under
+   * `Driver=image`) key off whether the value was looked up at all, not its
+   * final content. Reset on each new section header alongside `seenKeys`.
+   */
+  let reqLastValue = new Map<string, string>();
+  let reqLastNonEmpty = new Map<string, boolean>();
+  let reqSeenEver = new Set<string>();
+  /** Line number and raw text of the expected section's own header, for QL060/QL061 diagnostics. */
+  let reqHeaderLine = 0;
+  let reqHeaderRaw = "";
+  /**
    * When a value line ends with a backslash it continues onto the next
    * physical line(s). Those continuation lines are part of the value and must
    * not be classified as their own statements.
@@ -165,6 +187,9 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
       seenKeys = new Map();
       seenConflictKeys = new Map();
       reportedConflictPairs = new Set();
+      reqLastValue = new Map();
+      reqLastNonEmpty = new Map();
+      reqSeenEver = new Set();
 
       const known = KNOWN_SECTIONS.has(name) || isUserDefinedSection(name);
       if (!known) {
@@ -194,6 +219,8 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
       if (expected !== null && FILE_TYPE_SECTIONS.has(name)) {
         if (name === expected.section) {
           sawExpectedSection = true;
+          reqHeaderLine = lineNo;
+          reqHeaderRaw = raw;
         } else {
           const start = raw.indexOf("[");
           const end = raw.indexOf("]", start) + 1;
@@ -244,6 +271,17 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
       });
       inContinuation = endsWithContinuation(raw);
       continue;
+    }
+
+    // QL060/QL061 bookkeeping: only track keys while inside the file's own
+    // expected section, and only when we actually have one to check (see the
+    // EOF checks below for the full gating rationale).
+    if (expected !== null && currentSection === expected.section) {
+      const reqIsContinued = endsWithContinuation(raw);
+      const reqValue = raw.slice(eq + 1).trim();
+      reqLastValue.set(key, reqValue);
+      reqLastNonEmpty.set(key, reqIsContinued || reqValue !== "");
+      reqSeenEver.add(key);
     }
 
     // Unknown-key detection, restricted to the Quadlet-specific sections we
@@ -372,6 +410,63 @@ export function lintQuadlet(text: string, options?: { fileName?: string }): Diag
       code: Codes.SECTION_FILE_MISMATCH,
       message: `Missing required [${expected.section}] section — Quadlet fails to generate a service without it.`,
     });
+  }
+
+  // QL060/QL061: required keys, required one-of groups, and conditional
+  // requirements, evaluated against the file's own expected section. Gated
+  // exactly like the QL050 missing-section check above (a fileName that
+  // resolves to a non-drop-in section), plus one more condition: the
+  // expected section must have actually been seen. If it's missing
+  // entirely, QL050 already reports that as an error, so reporting QL060
+  // too would be duplicate noise for a single underlying problem.
+  if (expected !== null && !expected.isDropin && sawExpectedSection) {
+    const reportOnHeader = (code: string, message: string): void => {
+      const start = reqHeaderRaw.indexOf("[");
+      const end = reqHeaderRaw.indexOf("]", start) + 1;
+      diagnostics.push({
+        line: reqHeaderLine,
+        startColumn: start + 1,
+        endColumn: end + 1,
+        severity: "error",
+        code,
+        message,
+      });
+    };
+
+    const requirements = getSectionRequirements(expected.section);
+    if (requirements !== undefined) {
+      for (const plain of requirements.plain ?? []) {
+        if (reqLastNonEmpty.get(plain.key) !== true) {
+          reportOnHeader(
+            Codes.REQUIRED_KEY_MISSING,
+            `Missing required key "${plain.key}=" in [${expected.section}]. Quadlet fails to generate a service without it.`,
+          );
+        }
+      }
+      for (const group of requirements.oneOf ?? []) {
+        const satisfied = group.keys.some((k) => reqLastNonEmpty.get(k) === true);
+        if (!satisfied) {
+          const keyList = group.keys.map((k) => `"${k}="`).join(" or ");
+          reportOnHeader(
+            Codes.REQUIRED_KEY_MISSING,
+            `[${expected.section}] requires at least one of ${keyList}. Quadlet fails to generate a service without one of them set.`,
+          );
+        }
+      }
+    }
+
+    for (const conditional of getConditionalRequirements(expected.section)) {
+      if (!conditional.triggers(reqLastValue, reqLastNonEmpty)) continue;
+      const satisfied = conditional.presenceOnly
+        ? reqSeenEver.has(conditional.requiredKey)
+        : reqLastNonEmpty.get(conditional.requiredKey) === true;
+      if (!satisfied) {
+        reportOnHeader(
+          Codes.CONDITIONAL_REQUIREMENT,
+          `When ${conditional.triggerDescription} is set in [${expected.section}], "${conditional.requiredKey}=" is also required. Quadlet fails to generate a service without it.`,
+        );
+      }
+    }
   }
 
   return diagnostics.filter((d) => !suppress.get(d.line)?.has(d.code));
