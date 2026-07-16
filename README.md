@@ -45,21 +45,27 @@ A `# quadlet-lint-disable-next-line QLxxx` comment suppresses that one code on t
 
 ## CLI usage
 
-Lint a file straight from the terminal:
+Lint files or whole directories straight from the terminal:
 
 ```sh
 npx quadlet-lint web.container
 # or, once installed: quadlet-lint web.container
+
+# several paths at once, and directories to scan:
+quadlet-lint web.container db.volume
+quadlet-lint /etc/containers/systemd
 ```
 
-It prints one line per diagnostic and infers the section ↔ file-type checks (QL050) from the file name:
+It prints one line per diagnostic and infers the file-name-gated checks (QL050, QL060, QL061) from each file's own path:
 
 ```
 web.container:3:1: error QL050 Missing required [Container] section — Quadlet fails to generate a service without it.
 web.container:5:1: warning QL010 Unknown section "[Instal]". This will be ignored — check for a typo or a wrong file type.
 ```
 
-The **exit code** makes it usable as a gate in CI or a pre-commit hook: it exits **non-zero when any diagnostic is an `error`**, and **`0`** when the file is clean or has only warnings (warnings still print). A missing argument or an unreadable file exits `2`.
+A **directory** argument is scanned recursively, and only files Quadlet itself would recognize are linted: the known extensions, plus `.conf` drop-ins under a `<type>.d` directory. Everything else in the tree is skipped, symlinked directories are not followed, and results are reported in a stable, sorted order. A file named **explicitly** on the command line is always linted, even if its name isn't Quadlet-shaped, so `quadlet-lint ./some-unit` still works.
+
+The **exit code** makes it usable as a gate in CI or a pre-commit hook: it exits **non-zero when any diagnostic is an `error`**, and **`0`** when everything is clean or has only warnings (warnings still print). A missing argument, or any path that can't be read (including a directory that can't be listed), exits `2`; unreadable paths are named on stderr and don't stop the remaining files from being linted.
 
 ```sh
 quadlet-lint web.container && echo "ok to ship"

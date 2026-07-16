@@ -1,21 +1,13 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { runLint } from "../dist/cli.js";
+import { collectQuadletFiles, runLintPaths } from "../dist/cli.js";
 
-const file = process.argv[2];
-if (!file) {
-  process.stderr.write("usage: quadlet-lint <file>\n");
+const paths = process.argv.slice(2);
+if (paths.length === 0) {
+  process.stderr.write("usage: quadlet-lint <file-or-directory>...\n");
   process.exit(2);
 }
 
-let text;
-try {
-  text = readFileSync(file, "utf8");
-} catch (err) {
-  process.stderr.write(`quadlet-lint: cannot read ${file}: ${err.message}\n`);
-  process.exit(2);
-}
-
-const { output, exitCode } = runLint(text, file);
+const { output, errorOutput, exitCode } = runLintPaths(collectQuadletFiles(paths));
 if (output) process.stdout.write(output + "\n");
+if (errorOutput) process.stderr.write(errorOutput + "\n");
 process.exit(exitCode);
