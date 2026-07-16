@@ -28,7 +28,8 @@ import { lintQuadlet } from "quadlet-lint";
 const diagnostics = lintQuadlet(text);
 // → [{ line, startColumn, endColumn, severity: "error" | "warning", code, message }]
 
-// Pass the file name to also get section ↔ file-type cross-checks (QL050):
+// Pass the file name to also get the file-name-gated checks (QL050 section
+// cross-checks, plus QL060/QL061 required and conditional keys):
 const withFileChecks = lintQuadlet(text, { fileName: "web.container" });
 ```
 
@@ -65,7 +66,29 @@ web.container:5:1: warning QL010 Unknown section "[Instal]". This will be ignore
 
 A **directory** argument is scanned recursively, and only files Quadlet itself would recognize are linted: the known extensions, plus `.conf` drop-ins under a `<type>.d` directory. Everything else in the tree is skipped, symlinked directories are not followed, and results are reported in a stable, sorted order. A file named **explicitly** on the command line is always linted, even if its name isn't Quadlet-shaped, so `quadlet-lint ./some-unit` still works.
 
-The **exit code** makes it usable as a gate in CI or a pre-commit hook: it exits **non-zero when any diagnostic is an `error`**, and **`0`** when everything is clean or has only warnings (warnings still print). A missing argument, or any path that can't be read (including a directory that can't be listed), exits `2`; unreadable paths are named on stderr and don't stop the remaining files from being linted.
+Pass **`--format json`** (or `-f json`) for machine-readable output instead of the default text. It prints a single flat array of every diagnostic across all files, each entry tagged with its `file`, so it pipes straight into `jq`:
+
+```sh
+quadlet-lint --format json /etc/containers/systemd | jq '.[] | select(.severity == "error")'
+```
+
+```json
+[
+  {
+    "file": "web.container",
+    "line": 3,
+    "startColumn": 1,
+    "endColumn": 1,
+    "severity": "error",
+    "code": "QL050",
+    "message": "Missing required [Container] section — Quadlet fails to generate a service without it."
+  }
+]
+```
+
+A clean run prints `[]` rather than nothing, so a consumer can parse stdout unconditionally. In text output, the severity is colorized on a terminal; color is suppressed when the output is piped or when [`NO_COLOR`](https://no-color.org) is set.
+
+The **exit code** makes it usable as a gate in CI or a pre-commit hook: it exits **non-zero when any diagnostic is an `error`**, and **`0`** when everything is clean or has only warnings (warnings still print). A missing argument, an unknown `--format` value, or any path that can't be read (including a directory that can't be listed), exits `2`; unreadable paths are named on stderr and don't stop the remaining files from being linted.
 
 ```sh
 quadlet-lint web.container && echo "ok to ship"
@@ -160,13 +183,12 @@ The per-section key lists and their repeatability are [extracted from the offici
 
 **The committed data is a snapshot, not a live feed.** It reflects the doc as of the last regeneration and ships frozen in the published package, so clients get whatever was current when that version was published. 
 
-Keeping key data current is a maintenance step: refresh the vendored doc from upstream, regenerate, and publish a new version.
+Keeping key data current is a maintenance step: regenerate against upstream, sanity-check, and publish a new version. The generator ([`scripts/extract-keys.mjs`](scripts/extract-keys.mjs)) fetches the man page live from the upstream URL above, so there is no vendored copy to refresh first.
 
 ```sh
-# 1. refresh References/podman-systemd.unit.5.md from the upstream URL above
-npm run gen:keys   # 2. re-extract src/generated/keys.ts
-npm test           # 3. sanity-check the regenerated data
-# 4. commit + publish a new version
+npm run gen:keys   # 1. re-extract src/generated/keys.ts (fetches upstream live)
+npm test           # 2. sanity-check the regenerated data
+# 3. commit + publish a new version
 ```
 
 ## Roadmap

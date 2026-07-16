@@ -1,13 +1,20 @@
 #!/usr/bin/env node
-import { collectQuadletFiles, runLintPaths } from "../dist/cli.js";
+import { collectQuadletFiles, parseArgs, runLintPaths } from "../dist/cli.js";
 
-const paths = process.argv.slice(2);
-if (paths.length === 0) {
-  process.stderr.write("usage: quadlet-lint <file-or-directory>...\n");
+const parsed = parseArgs(process.argv.slice(2));
+if ("error" in parsed) {
+  process.stderr.write(parsed.error + "\n");
   process.exit(2);
 }
 
-const { output, errorOutput, exitCode } = runLintPaths(collectQuadletFiles(paths));
+// Color is decided here, at the impure edge, so the CLI core never touches
+// process. Honor NO_COLOR (https://no-color.org) and only colorize a TTY.
+const color = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
+
+const { output, errorOutput, exitCode } = runLintPaths(collectQuadletFiles(parsed.paths), {
+  format: parsed.format,
+  color,
+});
 if (output) process.stdout.write(output + "\n");
 if (errorOutput) process.stderr.write(errorOutput + "\n");
 process.exit(exitCode);

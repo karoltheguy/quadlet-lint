@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectQuadletFiles, runLintPaths } from "../src/cli.js";
+import { collectQuadletFiles, parseArgs, runLintPaths } from "../src/cli.js";
 
 // `chmod 000` does not restrict root, so any test relying on a directory
 // actually being unreadable would pass vacuously as root. Skip those tests
@@ -281,5 +281,128 @@ describe("collectQuadletFiles and runLintPaths (not implemented yet)", () => {
         }
       },
     );
+  });
+
+  describe("runLintPaths JSON format", () => {
+    it("emits a flat array of diagnostics, each tagged with its file", () => {
+      const file = join(dir, "web.container");
+      writeFileSync(file, "[Container]\nImage=nginx\nPull=sometimes\n");
+
+      const r = runLintPaths([file], { format: "json" });
+      const parsed = JSON.parse(r.output);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed.length).toBeGreaterThan(0);
+
+      const ql040 = parsed.find((d: { code: string }) => d.code === "QL040");
+      expect(ql040).toMatchObject({
+        file,
+        severity: "warning",
+        code: "QL040",
+      });
+      expect(typeof ql040.line).toBe("number");
+      expect(typeof ql040.startColumn).toBe("number");
+      expect(typeof ql040.endColumn).toBe("number");
+      expect(typeof ql040.message).toBe("string");
+    });
+
+    it("flattens diagnostics from multiple files into one array", () => {
+      const a = join(dir, "a.container");
+      const b = join(dir, "b.container");
+      writeFileSync(a, "notaline\n");
+      writeFileSync(b, "notaline\n");
+
+      const r = runLintPaths([a, b], { format: "json" });
+      const parsed = JSON.parse(r.output);
+      const files = new Set(parsed.map((d: { file: string }) => d.file));
+      expect(files).toEqual(new Set([a, b]));
+      expect(r.exitCode).toBe(1);
+    });
+
+    it("emits an empty array (not an empty string) for a clean run", () => {
+      const file = join(dir, "clean.container");
+      writeFileSync(file, "[Container]\nImage=nginx\n");
+
+      const r = runLintPaths([file], { format: "json" });
+      expect(r.output).toBe("[]");
+      expect(JSON.parse(r.output)).toEqual([]);
+      expect(r.exitCode).toBe(0);
+    });
+
+    it("still reports unreadable paths on stderr and exits 2 in JSON mode", () => {
+      const missing = join(dir, "does-not-exist.container");
+
+      const r = runLintPaths([missing], { format: "json" });
+      expect(r.exitCode).toBe(2);
+      expect(r.errorOutput.includes(missing)).toBe(true);
+      expect(r.output).toBe("[]");
+    });
+  });
+
+  describe("runLintPaths text color", () => {
+    it("leaves output byte-identical to the default when color is off", () => {
+      const file = join(dir, "web.container");
+      writeFileSync(file, "notaline\n");
+
+      const plain = runLintPaths([file]);
+      const explicit = runLintPaths([file], { format: "text", color: false });
+      expect(explicit.output).toBe(plain.output);
+      expect(plain.output.includes("\x1b[")).toBe(false);
+    });
+
+    it("colorizes the severity token when color is on", () => {
+      const file = join(dir, "web.container");
+      writeFileSync(file, "notaline\n");
+
+      const r = runLintPaths([file], { color: true });
+      // Red for the error severity, and the rest of the line intact.
+      expect(r.output.includes("\x1b[31merror\x1b[0m")).toBe(true);
+      expect(r.output.includes("QL001")).toBe(true);
+      expect(r.output.includes(file)).toBe(true);
+    });
+  });
+
+  describe("parseArgs", () => {
+    it("defaults to text format and collects bare paths", () => {
+      expect(parseArgs(["web.container", "db.volume"])).toEqual({
+        paths: ["web.container", "db.volume"],
+        format: "text",
+      });
+    });
+
+    it("parses --format json with a separate value", () => {
+      expect(parseArgs(["--format", "json", "web.container"])).toEqual({
+        paths: ["web.container"],
+        format: "json",
+      });
+    });
+
+    it("parses the -f short flag", () => {
+      expect(parseArgs(["-f", "json", "web.container"])).toEqual({
+        paths: ["web.container"],
+        format: "json",
+      });
+    });
+
+    it("parses the --format=json joined form", () => {
+      expect(parseArgs(["--format=json", "web.container"])).toEqual({
+        paths: ["web.container"],
+        format: "json",
+      });
+    });
+
+    it("errors on an unknown format", () => {
+      const r = parseArgs(["--format", "yaml", "web.container"]);
+      expect("error" in r && r.error.includes("yaml")).toBe(true);
+    });
+
+    it("errors when --format has no value", () => {
+      const r = parseArgs(["web.container", "--format"]);
+      expect("error" in r && r.error.includes("requires an argument")).toBe(true);
+    });
+
+    it("errors when no paths are given", () => {
+      const r = parseArgs(["--format", "json"]);
+      expect("error" in r).toBe(true);
+    });
   });
 });

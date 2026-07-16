@@ -1,7 +1,63 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { lintQuadlet } from "./index.js";
+import { lintQuadlet, type Diagnostic } from "./index.js";
 import { expectedSectionFor } from "./sections.js";
+
+/** Output format for CLI diagnostics. */
+export type OutputFormat = "text" | "json";
+
+/** Options controlling how `runLintPaths` renders its diagnostics. */
+export interface LintOptions {
+  /** Output format. Defaults to `"text"`. */
+  format?: OutputFormat;
+  /**
+   * Whether to colorize the text output with ANSI escapes. Ignored for JSON.
+   * Defaults to `false`. The bin entry point decides this from the TTY and
+   * `NO_COLOR`; the core never inspects `process` so it stays testable.
+   */
+  color?: boolean;
+}
+
+/** One diagnostic in the flat JSON output array, tagged with its file. */
+interface JsonDiagnostic {
+  file: string;
+  line: number;
+  startColumn: number;
+  endColumn: number;
+  severity: Diagnostic["severity"];
+  code: string;
+  message: string;
+}
+
+/**
+ * Wrap `severity` in an ANSI color when `color` is set: red for errors,
+ * yellow for warnings. Returns it untouched otherwise, which keeps the
+ * default text format byte-identical to what the README and tests assert.
+ */
+function colorizeSeverity(severity: Diagnostic["severity"], color: boolean): string {
+  if (!color) return severity;
+  const code = severity === "error" ? "31" : "33";
+  return `\x1b[${code}m${severity}\x1b[0m`;
+}
+
+/**
+ * Render `diagnostics` (all belonging to `fileName`) as the plain-text CLI
+ * format, one `file:line:col: severity code message` line each. With
+ * `color`, only the severity token is colorized; the rest is unchanged so
+ * the layout stays stable for anything parsing it.
+ */
+function formatDiagnosticsText(
+  fileName: string,
+  diagnostics: Diagnostic[],
+  color: boolean,
+): string {
+  return diagnostics
+    .map(
+      (d) =>
+        `${fileName}:${d.line}:${d.startColumn}: ${colorizeSeverity(d.severity, color)} ${d.code} ${d.message}`,
+    )
+    .join("\n");
+}
 
 /**
  * Lint `text` (the contents of `fileName`) and format the diagnostics as
@@ -10,9 +66,7 @@ import { expectedSectionFor } from "./sections.js";
 export function runLint(text: string, fileName: string): { output: string; exitCode: number } {
   const diagnostics = lintQuadlet(text, { fileName });
 
-  const output = diagnostics
-    .map((d) => `${fileName}:${d.line}:${d.startColumn}: ${d.severity} ${d.code} ${d.message}`)
-    .join("\n");
+  const output = formatDiagnosticsText(fileName, diagnostics, false);
 
   const exitCode = diagnostics.some((d) => d.severity === "error") ? 1 : 0;
 
@@ -90,12 +144,19 @@ export function collectQuadletFiles(paths: string[]): string[] {
  * which takes priority over an ordinary lint error (`1`) since a missing
  * file means the run couldn't even inspect everything it was asked to.
  */
-export function runLintPaths(paths: string[]): {
+export function runLintPaths(
+  paths: string[],
+  options: LintOptions = {},
+): {
   output: string;
   errorOutput: string;
   exitCode: number;
 } {
-  const outputs: string[] = [];
+  const format = options.format ?? "text";
+  const color = options.color ?? false;
+
+  const textOutputs: string[] = [];
+  const jsonDiagnostics: JsonDiagnostic[] = [];
   const errors: string[] = [];
   let hasLintError = false;
 
@@ -108,16 +169,81 @@ export function runLintPaths(paths: string[]): {
       continue;
     }
 
-    const { output, exitCode } = runLint(text, path);
-    if (output) outputs.push(output);
-    if (exitCode === 1) hasLintError = true;
+    const diagnostics = lintQuadlet(text, { fileName: path });
+    if (diagnostics.some((d) => d.severity === "error")) hasLintError = true;
+
+    if (format === "json") {
+      for (const d of diagnostics) {
+        jsonDiagnostics.push({
+          file: path,
+          line: d.line,
+          startColumn: d.startColumn,
+          endColumn: d.endColumn,
+          severity: d.severity,
+          code: d.code,
+          message: d.message,
+        });
+      }
+    } else {
+      const rendered = formatDiagnosticsText(path, diagnostics, color);
+      if (rendered) textOutputs.push(rendered);
+    }
   }
 
   const exitCode = errors.length > 0 ? 2 : hasLintError ? 1 : 0;
 
+  // JSON always emits a valid document (an empty array for a clean run) so a
+  // consumer can parse stdout unconditionally. Text stays empty when there is
+  // nothing to report, which the existing tests and README rely on.
+  const output =
+    format === "json" ? JSON.stringify(jsonDiagnostics, null, 2) : textOutputs.join("\n");
+
   return {
-    output: outputs.join("\n"),
+    output,
     errorOutput: errors.join("\n"),
     exitCode,
   };
+}
+
+const USAGE = "usage: quadlet-lint [--format text|json] <file-or-directory>...";
+
+/** Parsed CLI arguments, or an error message ready to print on stderr. */
+export type ParsedArgs = { paths: string[]; format: OutputFormat } | { error: string };
+
+/**
+ * Parse the CLI argument vector (everything after the node script name) into
+ * paths and an output format. Recognizes `--format <fmt>` / `-f <fmt>` and
+ * `--format=<fmt>`; every other token is treated as a path, so a bare
+ * `quadlet-lint <file>` keeps working. Returns an `error` message (no
+ * trailing newline) for a missing format value, an unknown format, or no
+ * paths at all. Kept here rather than in `bin/` so it can be unit-tested; the
+ * bin entry point only adds the impure TTY / `NO_COLOR` color decision.
+ */
+export function parseArgs(argv: string[]): ParsedArgs {
+  const paths: string[] = [];
+  let format = "text";
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--format" || arg === "-f") {
+      const value = argv[++i];
+      if (value === undefined) {
+        return { error: `quadlet-lint: ${arg} requires an argument\n${USAGE}` };
+      }
+      format = value;
+    } else if (arg.startsWith("--format=")) {
+      format = arg.slice("--format=".length);
+    } else {
+      paths.push(arg);
+    }
+  }
+
+  if (format !== "text" && format !== "json") {
+    return { error: `quadlet-lint: unknown format "${format}" (expected text or json)\n${USAGE}` };
+  }
+  if (paths.length === 0) {
+    return { error: USAGE };
+  }
+
+  return { paths, format };
 }
