@@ -46,6 +46,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "vite demo",
+    "build:demo": "vite build demo --base=./ --outDir dist-demo",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build",
     "package:vscode": "npm --prefix extensions/vscode run build && cd extensions/vscode && npx @vscode/vsce package --no-dependencies"
   },

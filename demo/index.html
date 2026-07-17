@@ -1,15 +1,236 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>quadlet-lint demo</title>
-    <style>
-      html, body { margin: 0; height: 100%; }
-      #editor { width: 100%; height: 100%; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>quadlet-lint — Live Demo & Linter for Podman Quadlet</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div id="editor"></div>
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">Q</div>
+        <div class="logo-text">
+          <h1>quadlet-lint</h1>
+          <p>Instant, as-you-type linting for Podman Quadlet files</p>
+        </div>
+      </div>
+      <div class="header-links">
+        <a href="https://github.com/karoltheguy/quadlet-lint" target="_blank" rel="noopener noreferrer">
+          <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Sidebar Panel -->
+      <section class="sidebar">
+        <nav class="sidebar-tabs">
+          <button class="tab-btn active" data-tab="rules-tab">Linter Rules</button>
+          <button class="tab-btn" data-tab="templates-tab">Templates</button>
+          <button class="tab-btn" data-tab="guide-tab">Getting Started</button>
+        </nav>
+
+        <!-- Rules Tab -->
+        <div id="rules-tab" class="tab-content active">
+          <div class="intro-card">
+            <p>
+              This linter analyzes Podman Quadlet files and provides instant feedback on syntax, structure, required options, and conflicts.
+            </p>
+          </div>
+          <div class="rules-container">
+            <div class="rule-card" data-rule="QL001">
+              <div class="rule-header">
+                <span class="rule-code">QL001</span>
+                <span class="rule-severity error">Error</span>
+              </div>
+              <p class="rule-desc">Malformed line. Not a comment, blank line, [Section], or Key=Value pair.</p>
+            </div>
+            
+            <div class="rule-card" data-rule="QL002">
+              <div class="rule-header">
+                <span class="rule-code">QL002</span>
+                <span class="rule-severity error">Error</span>
+              </div>
+              <p class="rule-desc">Key-value assignment appearing outside or before any [Section] header.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL010">
+              <div class="rule-header">
+                <span class="rule-code">QL010</span>
+                <span class="rule-severity warning">Warning</span>
+              </div>
+              <p class="rule-desc">Unknown section header name, or section intended for a different file type.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL020">
+              <div class="rule-header">
+                <span class="rule-code">QL020</span>
+                <span class="rule-severity warning">Warning</span>
+              </div>
+              <p class="rule-desc">Duplicate definition of a single-valued key where last-one-wins is unexpected.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL030">
+              <div class="rule-header">
+                <span class="rule-code">QL030</span>
+                <span class="rule-severity warning">Warning</span>
+              </div>
+              <p class="rule-desc">Key is not documented for the current section (typos or unsupported options).</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL040">
+              <div class="rule-header">
+                <span class="rule-code">QL040</span>
+                <span class="rule-severity warning">Warning</span>
+              </div>
+              <p class="rule-desc">Value is outside the closed set of allowed values for this specific key.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL050">
+              <div class="rule-header">
+                <span class="rule-code">QL050</span>
+                <span class="rule-severity error">Err/Warn</span>
+              </div>
+              <p class="rule-desc">Section mismatches file extension, or the main file-type section is entirely missing.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL060">
+              <div class="rule-header">
+                <span class="rule-code">QL060</span>
+                <span class="rule-severity error">Error</span>
+              </div>
+              <p class="rule-desc">Required key or one-of group of keys is missing from the main section.</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL061">
+              <div class="rule-header">
+                <span class="rule-code">QL061</span>
+                <span class="rule-severity error">Error</span>
+              </div>
+              <p class="rule-desc">Conditional requirement is not met (e.g. Volume Driver=image but no Image set).</p>
+            </div>
+
+            <div class="rule-card" data-rule="QL070">
+              <div class="rule-header">
+                <span class="rule-code">QL070</span>
+                <span class="rule-severity error">Error</span>
+              </div>
+              <p class="rule-desc">Conflicting keys declared in the same section that will fail generation.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Templates Tab -->
+        <div id="templates-tab" class="tab-content">
+          <div class="intro-card">
+            <p>Select a Quadlet template below to load a sample file into the editor. Try editing the keys and watch the linter updates.</p>
+          </div>
+          <nav class="templates-list">
+            <button class="template-btn" data-template="container">
+              <span>Container Service</span>
+              <span class="template-ext">.container</span>
+            </button>
+            <button class="template-btn" data-template="volume">
+              <span>Volume Definition</span>
+              <span class="template-ext">.volume</span>
+            </button>
+            <button class="template-btn" data-template="network">
+              <span>Network Definition</span>
+              <span class="template-ext">.network</span>
+            </button>
+            <button class="template-btn" data-template="pod">
+              <span>Pod Definition</span>
+              <span class="template-ext">.pod</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Getting Started Tab -->
+        <div id="guide-tab" class="tab-content">
+          <div class="guide-section">
+            <div class="guide-header-container">
+              <h3>NPM Installation</h3>
+              <span class="guide-badge unpublished">Coming Soon</span>
+            </div>
+            <p style="font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Install the core package to use programmatically in your JS/TS code:</p>
+            <div class="guide-code crossed-out">npm install quadlet-lint</div>
+            <p style="font-size: 0.75rem; margin-top: 0.4rem; color: var(--text-secondary); font-style: italic;">
+              * Note: The package is not yet published to npm. Clone the repository and use local linking instead.
+            </p>
+          </div>
+
+          <div class="guide-section">
+            <div class="guide-header-container">
+              <h3>CLI Usage</h3>
+              <span class="guide-badge unpublished">Coming Soon</span>
+            </div>
+            <p style="font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Run the linter on files or entire directories recursively:</p>
+            <div class="guide-code crossed-out">npx quadlet-lint /etc/containers/systemd</div>
+            <p style="font-size: 0.75rem; margin-top: 0.4rem; color: var(--text-secondary); font-style: italic;">
+              * Note: Once published, the CLI tool can be executed directly via npx.
+            </p>
+          </div>
+
+          <div class="guide-section">
+            <div class="guide-header-container">
+              <h3>VS Code Extension</h3>
+              <span class="guide-badge local">Local Build</span>
+            </div>
+            <p style="font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Package and install the extension for syntax highlighting and direct lint warnings:</p>
+            <div class="guide-code">npm run package:vscode</div>
+            <p style="font-size: 0.75rem; margin-top: 0.4rem; color: var(--text-secondary); font-style: italic;">
+              * Note: Build the package locally into a .vsix file, then install it in VS Code via "Install from VSIX".
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Editor Workspace -->
+      <section class="editor-workspace">
+        <div class="editor-window">
+          <div class="editor-header">
+            <div class="window-dots">
+              <span class="window-dot close"></span>
+              <span class="window-dot minimize"></span>
+              <span class="window-dot maximize"></span>
+            </div>
+            <div class="editor-controls">
+              <div class="filename-badge">
+                <span class="filename-icon">📄</span>
+                <select id="editor-filename-select">
+                  <option value="demo.container">demo.container</option>
+                  <option value="demo.volume">demo.volume</option>
+                  <option value="demo.network">demo.network</option>
+                  <option value="demo.pod">demo.pod</option>
+                </select>
+              </div>
+            </div>
+            <div style="width: 50px;"></div> <!-- visual spacer -->
+          </div>
+
+          <div id="editor"></div>
+
+          <div class="editor-status-bar">
+            <div class="status-markers">
+              <span class="status-badge errors"><span class="status-indicator-circle"></span><span id="error-count">0</span> Errors</span>
+              <span class="status-badge warnings"><span class="status-indicator-circle"></span><span id="warning-count">0</span> Warnings</span>
+            </div>
+            <div id="editor-status-msg">All systems normal</div>
+          </div>
+        </div>
+
+        <footer class="quick-actions">
+          <button class="action-btn" id="btn-clear">Clear</button>
+          <button class="action-btn" id="btn-reset">Reset</button>
+          <button class="action-btn primary" id="btn-copy">Copy Code</button>
+        </footer>
+      </section>
+    </main>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

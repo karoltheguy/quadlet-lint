@@ -92,7 +92,8 @@ export function lintModel(
   model: monaco.editor.ITextModel,
   owner: string = OWNER,
 ): Diagnostic[] {
-  const diagnostics = lintQuadlet(model.getValue());
+  const fileName = model.uri ? fileNameFrom(model.uri) : undefined;
+  const diagnostics = lintQuadlet(model.getValue(), { fileName });
   monacoNs.editor.setModelMarkers(model, owner, toMarkers(monacoNs, diagnostics));
   return diagnostics;
 }
