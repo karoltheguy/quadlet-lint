@@ -199,24 +199,51 @@
       <!-- Editor Workspace -->
       <section class="editor-workspace">
         <div class="editor-window">
-          <div class="editor-header">
-            <div class="window-dots">
-              <span class="window-dot close"></span>
-              <span class="window-dot minimize"></span>
-              <span class="window-dot maximize"></span>
+          <!-- KDE Plasma 6 Titlebar -->
+          <div class="titlebar">
+            <div class="titlebar-left">
+              <div class="titlebar-app-icon">Q</div>
             </div>
-            <div class="editor-controls">
-              <div class="filename-badge">
-                <span class="filename-icon">📄</span>
-                <select id="editor-filename-select">
-                  <option value="demo.container">demo.container</option>
-                  <option value="demo.volume">demo.volume</option>
-                  <option value="demo.network">demo.network</option>
-                  <option value="demo.pod">demo.pod</option>
-                </select>
-              </div>
+            <div class="titlebar-center">
+              <span id="titlebar-filename">demo.container</span> — Kate
             </div>
-            <div style="width: 50px;"></div> <!-- visual spacer -->
+            <div class="titlebar-right">
+              <button class="titlebar-action-btn minimize" aria-label="Minimize">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2">
+                  <path d="M1 3.5 L5 7.5 L9 3.5" />
+                </svg>
+              </button>
+              <button class="titlebar-action-btn maximize" aria-label="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2">
+                  <path d="M1 6.5 L5 2.5 L9 6.5" />
+                </svg>
+              </button>
+              <button class="titlebar-action-btn close" aria-label="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2">
+                  <path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Application Toolbar / Tabs -->
+          <div class="editor-tabs-bar">
+            <button class="editor-tab active" data-tab-file="container">
+              <span class="tab-icon">📄</span>
+              <span class="tab-label">demo.container</span>
+            </button>
+            <button class="editor-tab" data-tab-file="volume">
+              <span class="tab-icon">📄</span>
+              <span class="tab-label">demo.volume</span>
+            </button>
+            <button class="editor-tab" data-tab-file="network">
+              <span class="tab-icon">📄</span>
+              <span class="tab-label">demo.network</span>
+            </button>
+            <button class="editor-tab" data-tab-file="pod">
+              <span class="tab-icon">📄</span>
+              <span class="tab-label">demo.pod</span>
+            </button>
           </div>
 
           <div id="editor"></div>

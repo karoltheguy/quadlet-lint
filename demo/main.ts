@@ -227,17 +227,33 @@ function runLintAndUI() {
 model.onDidChangeContent(() => runLintAndUI());
 runLintAndUI();
 
+let currentTemplateName = "container"; // track current template for Reset
+
 // Switch model and load templates
 function switchTemplate(templateName: string) {
-  const selectEl = document.getElementById("editor-filename-select") as HTMLSelectElement;
-  selectEl.value = `demo.${templateName}`;
+  currentTemplateName = templateName;
+
+  // Update titlebar filename
+  const filename = `demo.${templateName}`;
+  document.getElementById("titlebar-filename")!.innerText = filename;
+
+  // Update active editor tab class
+  const editorTabsList = document.querySelectorAll(".editor-tab");
+  editorTabsList.forEach((tab) => {
+    const tabFile = tab.getAttribute("data-tab-file");
+    if (tabFile === templateName) {
+      tab.classList.add("active");
+    } else {
+      tab.classList.remove("active");
+    }
+  });
 
   const content = templates[templateName] || "";
   const oldModel = editor.getModel();
   const newModel = monaco.editor.createModel(
     content,
     "ini",
-    monaco.Uri.file(`demo.${templateName}`)
+    monaco.Uri.file(filename)
   );
   editor.setModel(newModel);
   if (oldModel) oldModel.dispose();
@@ -246,11 +262,13 @@ function switchTemplate(templateName: string) {
   runLintAndUI();
 }
 
-// UI: File selector change
-document.getElementById("editor-filename-select")!.addEventListener("change", (e) => {
-  const val = (e.target as HTMLSelectElement).value;
-  const templateName = val.split(".")[1]!;
-  switchTemplate(templateName);
+// UI: Editor Tabs click
+const editorTabsList = document.querySelectorAll(".editor-tab");
+editorTabsList.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const templateName = tab.getAttribute("data-tab-file")!;
+    switchTemplate(templateName);
+  });
 });
 
 // UI: Template buttons click
@@ -259,14 +277,10 @@ templateButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const templateName = btn.getAttribute("data-template")!;
     switchTemplate(templateName);
-    
-    // Switch to editor select value matching the button
-    const selectEl = document.getElementById("editor-filename-select") as HTMLSelectElement;
-    selectEl.value = `demo.${templateName}`;
   });
 });
 
-// UI: Tab switching logic
+// UI: Tab switching logic (sidebar)
 const tabButtons = document.querySelectorAll(".tab-btn");
 const tabContents = document.querySelectorAll(".tab-content");
 tabButtons.forEach((btn) => {
@@ -288,8 +302,22 @@ ruleCards.forEach((card) => {
     const ruleCode = card.getAttribute("data-rule")!;
     const example = ruleExamples[ruleCode];
     if (example) {
-      const selectEl = document.getElementById("editor-filename-select") as HTMLSelectElement;
-      selectEl.value = example.fileName;
+      const templateName = example.fileName.split(".")[1]!;
+      currentTemplateName = templateName;
+
+      // Update titlebar filename
+      document.getElementById("titlebar-filename")!.innerText = example.fileName;
+
+      // Update active editor tab class
+      const editorTabsList = document.querySelectorAll(".editor-tab");
+      editorTabsList.forEach((tab) => {
+        const tabFile = tab.getAttribute("data-tab-file");
+        if (tabFile === templateName) {
+          tab.classList.add("active");
+        } else {
+          tab.classList.remove("active");
+        }
+      });
 
       const oldModel = editor.getModel();
       const newModel = monaco.editor.createModel(
@@ -312,9 +340,7 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
 });
 
 document.getElementById("btn-reset")!.addEventListener("click", () => {
-  const selectEl = document.getElementById("editor-filename-select") as HTMLSelectElement;
-  const templateName = selectEl.value.split(".")[1]!;
-  editor.setValue(templates[templateName] || "");
+  editor.setValue(templates[currentTemplateName] || "");
 });
 
 document.getElementById("btn-copy")!.addEventListener("click", () => {
