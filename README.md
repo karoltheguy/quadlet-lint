@@ -121,6 +121,8 @@ registerCodeActionProvider(monaco, "ini");
 
 Completions are file-type aware when the model's URI has a Quadlet extension (e.g. `web.container` won't suggest `[Pod]`).
 
+Key completions and hover also cover the standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) with the directives from their man pages, the most common ones with hover documentation. This is editor convenience only: keys in those sections are never validated, so an uncommon systemd directive is still accepted silently.
+
 ## VS Code usage
 
 A VS Code extension is in [`extensions/vscode`](extensions/vscode), built on the same service layer as the Monaco adapter: diagnostics, completions, hover documentation, and quick fixes, plus a TextMate grammar and language configuration for `.container`/`.pod`/`.network`/`.volume`/`.kube`/`.build`/`.image`/`.artifact` files.

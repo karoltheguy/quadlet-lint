@@ -17,6 +17,12 @@ import {
   expectedSectionFor,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
+import {
+  hasSystemdKeyData,
+  isKnownSystemdKey,
+  getSystemdSectionKeys,
+  getSystemdKeyDescription,
+} from "./systemd.js";
 
 /**
  * A cursor/caret position. 1-based, matching {@link Diagnostic} in
@@ -108,9 +114,20 @@ export function getHover(text: string, position: Position): HoverInfo | null {
         return null;
       }
 
-      if (!hasKeyData(currentSection) || !isKnownKey(currentSection, key)) return null;
+      if (hasKeyData(currentSection)) {
+        if (!isKnownKey(currentSection, key)) return null;
+        return { section: currentSection, key, description: getKeyDescription(currentSection, key) };
+      }
 
-      return { section: currentSection, key, description: getKeyDescription(currentSection, key) };
+      if (hasSystemdKeyData(currentSection) && isKnownSystemdKey(currentSection, key)) {
+        return {
+          section: currentSection,
+          key,
+          description: getSystemdKeyDescription(currentSection, key),
+        };
+      }
+
+      return null;
     }
 
     inContinuation = endsWithContinuation(raw);
@@ -185,6 +202,7 @@ export function getCompletions(
   if (trimmedBefore === "") {
     if (currentSection === null) return sectionCompletions(fileName);
     if (hasKeyData(currentSection)) return keyCompletions(currentSection);
+    if (hasSystemdKeyData(currentSection)) return systemdKeyCompletions(currentSection);
     return [];
   }
 
@@ -203,6 +221,10 @@ export function getCompletions(
 
   if (currentSection !== null && hasKeyData(currentSection)) {
     return keyCompletions(currentSection);
+  }
+
+  if (currentSection !== null && hasSystemdKeyData(currentSection)) {
+    return systemdKeyCompletions(currentSection);
   }
 
   return [];
@@ -225,6 +247,12 @@ function sectionCompletions(fileName?: string): CompletionItem[] {
 
 function keyCompletions(section: string): CompletionItem[] {
   const keys = getSectionKeys(section);
+  if (!keys) return [];
+  return [...keys].map((label) => ({ label }));
+}
+
+function systemdKeyCompletions(section: string): CompletionItem[] {
+  const keys = getSystemdSectionKeys(section);
   if (!keys) return [];
   return [...keys].map((label) => ({ label }));
 }
