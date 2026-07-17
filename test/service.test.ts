@@ -72,8 +72,8 @@ describe("getHover", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null in a standard systemd section with no key data", () => {
-    const text = "[Unit]\nDescription=hi\n";
+  it("returns null in a section with no key data", () => {
+    const text = "[X-Custom]\nDescription=hi\n";
     const result = getHover(text, { line: 2, column: 3 });
     expect(result).toBeNull();
   });
@@ -156,8 +156,8 @@ describe("getCompletions", () => {
     expect(found).not.toEqual(expect.arrayContaining(["Container"]));
   });
 
-  it("returns no key completions in a standard systemd section", () => {
-    const text = "[Unit]\n";
+  it("returns no key completions in a section without key data", () => {
+    const text = "[X-Custom]\n";
     const result = getCompletions(text, { line: 2, column: 1 });
     expect(result).toEqual([]);
   });
@@ -237,5 +237,65 @@ describe("getQuickFixes", () => {
     const diag = diags.find((d: Diagnostic) => d.code === "QL010");
     expect(diag).toBeDefined();
     expect(getQuickFixes(text, diag as Diagnostic)).toEqual([]);
+  });
+});
+
+describe("systemd section completions and hover", () => {
+  function labels(items: CompletionItem[]): string[] {
+    return items.map((item) => item.label);
+  }
+
+  it("suggests keys within [Unit]", () => {
+    const text = "[Unit]\n";
+    const result = getCompletions(text, { line: 2, column: 1 });
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Description", "After"]));
+  });
+
+  it("suggests keys within [Service]", () => {
+    const text = "[Service]\n";
+    const result = getCompletions(text, { line: 2, column: 1 });
+    const found = labels(result);
+    expect(found).toEqual(expect.arrayContaining(["Restart", "ExecStartPre"]));
+  });
+
+  it("suggests keys within [Install]", () => {
+    const text = "[Install]\n";
+    const result = getCompletions(text, { line: 2, column: 1 });
+    const found = labels(result);
+    expect(found).toEqual(
+      expect.arrayContaining(["WantedBy", "Alias", "RequiredBy", "UpheldBy"]),
+    );
+  });
+
+  it("returns hover info for WantedBy in [Install]", () => {
+    const text = "[Install]\nWantedBy=multi-user.target\n";
+    const result = getHover(text, { line: 2, column: 2 });
+    expect(result).not.toBeNull();
+    expect(result?.section).toBe("Install");
+    expect(result?.key).toBe("WantedBy");
+    expect(typeof result?.description).toBe("string");
+    expect(result?.description).not.toBeNull();
+  });
+
+  it("returns hover info for a known-but-undescribed [Unit] key", () => {
+    const text = "[Unit]\nConditionACPower=true\n";
+    const result = getHover(text, { line: 2, column: 2 });
+    expect(result).not.toBeNull();
+    expect(result?.key).toBe("ConditionACPower");
+  });
+
+  it("returns null for a bogus key in [Unit]", () => {
+    const text = "[Unit]\nNotARealKey=x\n";
+    const result = getHover(text, { line: 2, column: 2 });
+    expect(result).toBeNull();
+  });
+
+  it("does not emit QL030 for unknown keys in [Unit], [Service], or [Install]", () => {
+    const text =
+      "[Unit]\nSomeMadeUpKey=1\n[Service]\nSomeMadeUpKey=1\n[Install]\nSomeMadeUpKey=1\n";
+    const diags = lintQuadlet(text);
+    const unknownKeyDiags = diags.filter((d: Diagnostic) => d.code === "QL030");
+    expect(unknownKeyDiags).toEqual([]);
   });
 });
