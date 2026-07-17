@@ -20,6 +20,31 @@ describe("SECTION_ENUMS / getEnumValues", () => {
     expect(getEnumValues("Container", "Image")).toBeUndefined();
   });
 
+  it("Network Driver has the documented network-driver values", () => {
+    expect(getEnumValues("Network", "Driver")).toEqual(
+      new Set(["bridge", "macvlan", "ipvlan"]),
+    );
+  });
+
+  it("Network IPAMDriver has the documented IPAM-driver values", () => {
+    expect(getEnumValues("Network", "IPAMDriver")).toEqual(
+      new Set(["host-local", "dhcp", "none"]),
+    );
+  });
+
+  it("boolean keys share the same 8-value systemd boolean set", () => {
+    const booleanSet = getEnumValues("Container", "ReadOnly");
+
+    expect(getEnumValues("Container", "ReadOnlyTmpfs")).toEqual(booleanSet);
+    expect(getEnumValues("Container", "StartWithPod")).toEqual(booleanSet);
+    expect(getEnumValues("Container", "EnvironmentHost")).toEqual(booleanSet);
+    expect(getEnumValues("Volume", "Copy")).toEqual(booleanSet);
+    expect(getEnumValues("Build", "ForceRM")).toEqual(booleanSet);
+    expect(getEnumValues("Build", "TLSVerify")).toEqual(booleanSet);
+    expect(getEnumValues("Image", "AllTags")).toEqual(booleanSet);
+    expect(getEnumValues("Image", "TLSVerify")).toEqual(booleanSet);
+  });
+
   it("every curated enum key is a documented key for its section (no drift from generated key data)", () => {
     for (const section of Object.keys(SECTION_ENUMS)) {
       const keys = SECTION_ENUMS[section as keyof typeof SECTION_ENUMS];
