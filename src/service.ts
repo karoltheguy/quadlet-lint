@@ -270,10 +270,19 @@ export interface QuickFix {
  * returns a single fix that replaces the key with the match. Also handles
  * {@link Codes.UNKNOWN_SECTION} (QL010): when the typo'd section name has a
  * close match among {@link KNOWN_SECTIONS}, this returns a single fix that
- * replaces the section header with the match. Returns `[]` for any other
- * diagnostic code, or when no close match exists.
+ * replaces the section header with the match. Also handles
+ * {@link Codes.ENUM_VALUE} (QL040): when the invalid value has a close match
+ * among the key's curated closed-set of values (see {@link getEnumValues}),
+ * this returns a single fix that replaces the value with the match. Also
+ * handles {@link Codes.SECTION_FILE_MISMATCH} (QL050), but only when
+ * `fileName` is given (otherwise `[]`): for a section/file-type mismatch
+ * (`diagnostic.severity === "warning"`) this returns a single fix that
+ * replaces the section header with the expected one; for a missing required
+ * section (`diagnostic.severity === "error"`) this returns a single fix that
+ * inserts the expected section at the top of the file. Returns `[]` for any
+ * other diagnostic code, or when no close match / expected section exists.
  */
-export function getQuickFixes(text: string, diagnostic: Diagnostic): QuickFix[] {
+export function getQuickFixes(text: string, diagnostic: Diagnostic, fileName?: string): QuickFix[] {
   if (diagnostic.code === Codes.UNKNOWN_SECTION) {
     const lines = text.split(/\r?\n/);
     const token = lines[diagnostic.line - 1]!.slice(diagnostic.startColumn - 1, diagnostic.endColumn - 1); // "[name]"
@@ -291,6 +300,100 @@ export function getQuickFixes(text: string, diagnostic: Diagnostic): QuickFix[] 
             newText: `[${match}]`,
           },
         ],
+      },
+    ];
+  }
+
+  if (diagnostic.code === Codes.ENUM_VALUE) {
+    const lines = text.split(/\r?\n/);
+
+    let currentSection: string | null = null;
+    let inContinuation = false;
+
+    for (let i = 0; i < diagnostic.line - 1; i++) {
+      const raw = lines[i]!;
+
+      if (inContinuation) {
+        inContinuation = endsWithContinuation(raw);
+        continue;
+      }
+
+      const trimmed = raw.trim();
+      if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+        continue;
+      }
+
+      const sectionMatch = SECTION_RE.exec(raw);
+      if (sectionMatch) {
+        currentSection = sectionMatch.groups!.name!;
+        inContinuation = endsWithContinuation(raw);
+        continue;
+      }
+
+      const eq = raw.indexOf("=");
+      if (eq === -1) {
+        inContinuation = endsWithContinuation(raw);
+        continue;
+      }
+
+      inContinuation = endsWithContinuation(raw);
+    }
+
+    if (currentSection === null) return [];
+
+    const diagLine = lines[diagnostic.line - 1]!;
+    const eq = diagLine.indexOf("=");
+    if (eq === -1) return [];
+    const key = diagLine.slice(0, eq).trim();
+
+    const values = getEnumValues(currentSection, key);
+    if (!values) return [];
+
+    const value = diagLine.slice(diagnostic.startColumn - 1, diagnostic.endColumn - 1);
+    const match = findBestMatch(value.toLowerCase(), values);
+    if (match === null) return [];
+
+    return [
+      {
+        title: `Change to "${match}"`,
+        edits: [
+          {
+            line: diagnostic.line,
+            startColumn: diagnostic.startColumn,
+            endColumn: diagnostic.endColumn,
+            newText: match,
+          },
+        ],
+      },
+    ];
+  }
+
+  if (diagnostic.code === Codes.SECTION_FILE_MISMATCH) {
+    if (!fileName) return [];
+
+    const expected = expectedSectionFor(fileName);
+    if (expected === null) return [];
+
+    if (diagnostic.severity === "warning") {
+      return [
+        {
+          title: `Change to "[${expected.section}]"`,
+          edits: [
+            {
+              line: diagnostic.line,
+              startColumn: diagnostic.startColumn,
+              endColumn: diagnostic.endColumn,
+              newText: `[${expected.section}]`,
+            },
+          ],
+        },
+      ];
+    }
+
+    return [
+      {
+        title: `Insert "[${expected.section}]" section`,
+        edits: [{ line: 1, startColumn: 1, endColumn: 1, newText: `[${expected.section}]\n` }],
       },
     ];
   }

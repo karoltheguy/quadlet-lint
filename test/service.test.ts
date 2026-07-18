@@ -240,6 +240,96 @@ describe("getQuickFixes", () => {
   });
 });
 
+describe("getQuickFixes (QL040/QL050, extended with fileName)", () => {
+  it("suggests a fix for an unrecognized enum value with a close match (QL040)", () => {
+    const text = "[Container]\nImage=img\nPull=allways\n";
+    const diags = lintQuadlet(text, { fileName: "web.container" });
+    const diag = diags.find((d: Diagnostic) => d.code === "QL040");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic, "web.container");
+    expect(fixes).toEqual([
+      {
+        title: 'Change to "always"',
+        edits: [
+          {
+            line: (diag as Diagnostic).line,
+            startColumn: (diag as Diagnostic).startColumn,
+            endColumn: (diag as Diagnostic).endColumn,
+            newText: "always",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("returns no fixes for an enum value with no close match (QL040)", () => {
+    const text = "[Container]\nImage=img\nPull=zzzzzz\n";
+    const diags = lintQuadlet(text, { fileName: "web.container" });
+    const diag = diags.find((d: Diagnostic) => d.code === "QL040");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic, "web.container");
+    expect(fixes).toEqual([]);
+  });
+
+  it("suggests a fix for a section/file-type mismatch (QL050)", () => {
+    const text = "[Pod]\nPodName=p\n";
+    const diags = lintQuadlet(text, { fileName: "web.container" });
+    const diag = diags.find((d: Diagnostic) => d.code === "QL050" && d.severity === "warning");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic, "web.container");
+    expect(fixes).toEqual([
+      {
+        title: 'Change to "[Container]"',
+        edits: [
+          {
+            line: (diag as Diagnostic).line,
+            startColumn: (diag as Diagnostic).startColumn,
+            endColumn: (diag as Diagnostic).endColumn,
+            newText: "[Container]",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("suggests a fix to insert the missing required section (QL050)", () => {
+    const text = "[Unit]\nDescription=hi\n";
+    const diags = lintQuadlet(text, { fileName: "web.container" });
+    const diag = diags.find((d: Diagnostic) => d.code === "QL050" && d.severity === "error");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic, "web.container");
+    expect(fixes).toEqual([
+      {
+        title: 'Insert "[Container]" section',
+        edits: [{ line: 1, startColumn: 1, endColumn: 1, newText: "[Container]\n" }],
+      },
+    ]);
+  });
+
+  it("returns no fixes for a QL050 mismatch when no fileName is given to getQuickFixes", () => {
+    const text = "[Pod]\nPodName=p\n";
+    const diags = lintQuadlet(text, { fileName: "web.container" });
+    const diag = diags.find((d: Diagnostic) => d.code === "QL050" && d.severity === "warning");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic);
+    expect(fixes).toEqual([]);
+  });
+
+  it("still fixes a typo'd key when the extra fileName argument is passed (regression)", () => {
+    const text = "[Container]\nImge=foo\n";
+    const diags = lintQuadlet(text);
+    const diag = diags.find((d: Diagnostic) => d.code === "QL030");
+    expect(diag).toBeDefined();
+    const fixes = getQuickFixes(text, diag as Diagnostic, "web.container");
+    expect(fixes).toEqual([
+      {
+        title: 'Change to "Image"',
+        edits: [{ line: 2, startColumn: 1, endColumn: 5, newText: "Image" }],
+      },
+    ]);
+  });
+});
+
 describe("systemd section completions and hover", () => {
   function labels(items: CompletionItem[]): string[] {
     return items.map((item) => item.label);

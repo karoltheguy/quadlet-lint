@@ -164,7 +164,7 @@ export function createCodeActionProvider(vscodeNs: VscodeLike): CodeActionProvid
           message: d.message ?? "",
         };
 
-        const fixes = getQuickFixes(text, diagnostic);
+        const fixes = getQuickFixes(text, diagnostic, document.uri.path);
         for (const fix of fixes) {
           const action = new vscodeNs.CodeAction(fix.title, vscodeNs.CodeActionKind.QuickFix);
           action.diagnostics = [d];

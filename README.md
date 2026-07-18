@@ -109,7 +109,7 @@ model.onDidChangeContent(() => lintModel(monaco, model));
 
 `lintModel` publishes results via `setModelMarkers(model, "quadlet-lint", …)`. If you want the markers without publishing them, use `toMarkers(monaco, lintQuadlet(text))`.
 
-Beyond markers, the adapter can register language providers for completions (sections, keys, and enum values), hover documentation, and quick fixes (e.g. rewriting a typo'd key). Providers register per language ID, so give your model a language (the built-in `ini` works well for unit files):
+Beyond markers, the adapter can register language providers for completions (sections, keys, and enum values), hover documentation, and quick fixes (rewriting a typo'd section, key, or enum value, and correcting or inserting the section a file's type expects). Providers register per language ID, so give your model a language (the built-in `ini` works well for unit files):
 
 ```ts
 import { registerCompletionProvider, registerHoverProvider, registerCodeActionProvider } from "quadlet-lint/monaco";
@@ -143,10 +143,10 @@ import { getCompletions, getHover, getQuickFixes } from "quadlet-lint/service";
 
 getCompletions(text, { line, column }, fileName);
 getHover(text, { line, column });
-getQuickFixes(text, diagnostic);
+getQuickFixes(text, diagnostic, fileName);
 ```
 
-Positions are the same `{ line, column }` used elsewhere.
+Positions are the same `{ line, column }` used elsewhere. `getQuickFixes`'s `fileName` is optional and only gates the QL050 fixes (correcting or inserting the file type's expected section), which need to know the file's type; without it those fixes simply aren't offered.
 `TextEdit`/`CompletionItem`/`HoverInfo`/`QuickFix` are plain interfaces exported alongside these functions.
 
 ## What it checks

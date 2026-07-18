@@ -158,7 +158,8 @@ export function registerHoverProvider(
 
 /**
  * Register a code action provider for `languageId` that offers quick fixes
- * (currently for QL030 typo'd keys) from {@link getQuickFixes}.
+ * (typo'd sections and keys, enum values, and file-type section mismatches)
+ * from {@link getQuickFixes}.
  */
 export function registerCodeActionProvider(
   monacoNs: Pick<MonacoLike, "languages">,
@@ -175,7 +176,7 @@ export function registerCodeActionProvider(
           code: markerCode(marker.code),
           message: marker.message ?? "",
         };
-        const fixes = getQuickFixes(model.getValue(), diagnostic);
+        const fixes = getQuickFixes(model.getValue(), diagnostic, model.uri ? fileNameFrom(model.uri) : undefined);
         return fixes.map((fix) => ({
           title: fix.title,
           kind: "quickfix",
