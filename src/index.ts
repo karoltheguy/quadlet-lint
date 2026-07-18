@@ -24,11 +24,17 @@ import {
   getConditionalRequirements,
   expectedSectionFor,
   hasPortFormat,
+  hasAddHostFormat,
+  hasByteSizeFormat,
+  hasDurationFormat,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
 import { SECTION_REFERENCES } from "./references.js";
 import type { UnitIndex } from "./unit-index.js";
 import { isMalformedPortValue } from "./ports.js";
+import { isMalformedAddHost } from "./addhost.js";
+import { isMalformedByteSize } from "./bytesize.js";
+import { isMalformedDuration } from "./duration.js";
 
 export type Severity = "error" | "warning";
 
@@ -66,6 +72,12 @@ export const Codes = {
   ENUM_VALUE: "QL040",
   /** A port-mapping value with a numeric field outside the valid 1-65535 port range. */
   PORT_FORMAT: "QL080",
+  /** An AddHost= value missing the required host-to-IP separator. */
+  ADD_HOST_FORMAT: "QL081",
+  /** A Memory=/ShmSize= value that isn't a valid go-units byte size. */
+  BYTE_SIZE_FORMAT: "QL082",
+  /** A health-check timing key whose value is not a valid Go duration. */
+  DURATION_FORMAT: "QL083",
   /**
    * A file-specific Quadlet section that doesn't match the file's type, or
    * the expected section missing entirely.
@@ -408,6 +420,57 @@ export function lintQuadlet(
             severity: "warning",
             code: Codes.PORT_FORMAT,
             message: `Malformed port value "${value}" for ${key}= — port numbers must be between 1 and 65535. Expected form: ip:hostPort:containerPort (with optional /tcp or /udp). It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
+
+      // AddHost-format detection: AddHost= is documented as hostname:ip. A value
+      // with neither `:` nor `=` (the two accepted host/ip separators) cannot be
+      // a valid mapping. Reuses the same bypass discipline as QL040/QL080 above.
+      // Kept a warning since a value we flag may still be valid in a newer Podman.
+      if (hasAddHostFormat(currentSection, key)) {
+        if (value !== "" && !hasInterpolation && isMalformedAddHost(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.ADD_HOST_FORMAT,
+            message: `AddHost value "${value}" is missing the required host-to-IP separator — expected form hostname:ip. It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
+
+      // Byte-size-format detection: Memory=/ShmSize= take a go-units byte size
+      // (number + optional unit). Reuses the QL040/QL080/QL081 bypass discipline.
+      // Kept a warning: a value we flag may still be valid in a newer Podman.
+      if (hasByteSizeFormat(currentSection, key)) {
+        if (value !== "" && !hasInterpolation && isMalformedByteSize(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.BYTE_SIZE_FORMAT,
+            message: `Malformed byte-size value "${value}" for ${key}= — expected a number with an optional unit suffix (e.g. 512m, 1.5g, 512MiB). It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
+
+      // Duration-format detection: the health-check timing keys take a Go
+      // duration (parsed by Podman's --health-* via time.ParseDuration), not
+      // systemd time syntax. Reuses the QL040/QL080/QL081/QL082 bypass
+      // discipline. Kept a warning: a value we flag may still be valid in a
+      // newer Podman.
+      if (hasDurationFormat(currentSection, key)) {
+        if (value !== "" && !hasInterpolation && isMalformedDuration(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.DURATION_FORMAT,
+            message: `Malformed duration value "${value}" for ${key}= — expected a Go-style duration such as 30s, 1m30s, or 500ms (systemd forms like "30" or "5min" are not accepted), or "disable". It may also be valid in a newer Podman version.`,
           });
         }
       }

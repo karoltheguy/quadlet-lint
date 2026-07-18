@@ -14,6 +14,9 @@ import { SECTION_KEYS } from "./generated/keys.js";
 import { SECTION_ENUMS } from "./enums.js";
 import { SECTION_CONFLICTS } from "./conflicts.js";
 import { PORT_FORMAT_KEYS } from "./ports.js";
+import { ADD_HOST_KEYS } from "./addhost.js";
+import { BYTE_SIZE_KEYS } from "./bytesize.js";
+import { DURATION_KEYS } from "./duration.js";
 import {
   SECTION_REQUIRED,
   SECTION_CONDITIONAL,
@@ -95,6 +98,33 @@ export function getEnumValues(section: string, key: string): ReadonlySet<string>
  */
 export function hasPortFormat(section: string, key: string): boolean {
   return PORT_FORMAT_KEYS[section]?.has(key) ?? false;
+}
+
+/**
+ * Whether `key` in `section` carries a Podman AddHost= host-to-IP mapping
+ * value (see {@link ADD_HOST_KEYS}), and is therefore a candidate for QL081
+ * malformed-AddHost-value checking.
+ */
+export function hasAddHostFormat(section: string, key: string): boolean {
+  return ADD_HOST_KEYS[section]?.has(key) ?? false;
+}
+
+/**
+ * Whether `key` in `section` carries a Podman byte-size value (see
+ * {@link BYTE_SIZE_KEYS}), and is therefore a candidate for QL082
+ * malformed-byte-size checking.
+ */
+export function hasByteSizeFormat(section: string, key: string): boolean {
+  return BYTE_SIZE_KEYS[section]?.has(key) ?? false;
+}
+
+/**
+ * Whether `key` in `section` carries a Go duration value (see
+ * {@link DURATION_KEYS}), and is therefore a candidate for QL083
+ * malformed-duration checking.
+ */
+export function hasDurationFormat(section: string, key: string): boolean {
+  return DURATION_KEYS[section]?.has(key) ?? false;
 }
 
 /**

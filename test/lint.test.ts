@@ -535,6 +535,205 @@ describe("QL080 port-format", () => {
   });
 });
 
+describe("QL081 AddHost-format", () => {
+  /** Convenience: QL081 diagnostics present in a lint run. */
+  function ql081(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL081");
+  }
+
+  it("flags an AddHost= value missing the hostname:ip separator in [Container]", () => {
+    const diags = ql081("[Container]\nAddHost=example.com");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL081",
+      severity: "warning",
+    });
+  });
+
+  it("flags an AddHost= value missing the hostname:ip separator in [Pod]", () => {
+    const diags = ql081("[Pod]\nAddHost=example.com");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL081",
+      severity: "warning",
+    });
+  });
+
+  it("does not flag a valid hostname:IPv4 mapping", () => {
+    expect(ql081("[Container]\nAddHost=example.com:192.0.2.1")).toEqual([]);
+  });
+
+  it("does not flag the host-gateway special value", () => {
+    expect(ql081("[Container]\nAddHost=example.com:host-gateway")).toEqual([]);
+  });
+
+  it("does not flag a valid hostname:IPv6 mapping", () => {
+    expect(ql081("[Container]\nAddHost=myhost:2001:db8::1")).toEqual([]);
+  });
+
+  it("does not flag the = separator variant", () => {
+    expect(ql081("[Container]\nAddHost=foo=192.0.2.1")).toEqual([]);
+  });
+
+  it("does not validate interpolated values", () => {
+    expect(ql081("[Container]\nAddHost=$HOST")).toEqual([]);
+  });
+
+  it("does not flag an empty value", () => {
+    expect(ql081("[Container]\nAddHost=")).toEqual([]);
+  });
+
+  it("skips values that span a line continuation", () => {
+    const text = "[Container]\nAddHost=example.com \\\n:192.0.2.1";
+    expect(ql081(text)).toEqual([]);
+  });
+});
+
+describe("QL082 byte-size format", () => {
+  /** Convenience: QL082 diagnostics present in a lint run. */
+  function ql082(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL082");
+  }
+
+  it("flags a Memory= value with no digit at all", () => {
+    const diags = ql082("[Container]\nMemory=big");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL082",
+      severity: "warning",
+    });
+  });
+
+  it("flags a Memory= value with two stacked prefix letters", () => {
+    const diags = ql082("[Container]\nMemory=512mk");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL082",
+      severity: "warning",
+    });
+  });
+
+  it("flags a ShmSize= value with two stacked prefix letters in [Pod]", () => {
+    const diags = ql082("[Pod]\nShmSize=512mk");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL082",
+      severity: "warning",
+    });
+  });
+
+  it("does not flag a bare integer value", () => {
+    expect(ql082("[Container]\nMemory=512")).toEqual([]);
+  });
+
+  it("does not flag a value with a single unit letter", () => {
+    expect(ql082("[Container]\nMemory=512m")).toEqual([]);
+  });
+
+  it("does not flag a value with a two-letter SI unit suffix", () => {
+    expect(ql082("[Container]\nMemory=512mb")).toEqual([]);
+  });
+
+  it("does not flag a value with an IEC unit suffix", () => {
+    expect(ql082("[Container]\nMemory=512kib")).toEqual([]);
+  });
+
+  it("does not flag a fractional value", () => {
+    expect(ql082("[Container]\nMemory=1.5g")).toEqual([]);
+  });
+
+  it("does not flag a value with an optional single space before the suffix", () => {
+    expect(ql082("[Container]\nMemory=512 m")).toEqual([]);
+  });
+
+  it("does not flag a zero value", () => {
+    expect(ql082("[Container]\nMemory=0")).toEqual([]);
+  });
+
+  it("does not flag a valid ShmSize= value", () => {
+    expect(ql082("[Container]\nShmSize=64m")).toEqual([]);
+  });
+
+  it("does not validate interpolated values", () => {
+    expect(ql082("[Container]\nMemory=$MEM")).toEqual([]);
+  });
+
+  it("does not flag an empty value", () => {
+    expect(ql082("[Container]\nMemory=")).toEqual([]);
+  });
+
+  it("skips values that span a line continuation", () => {
+    const text = "[Container]\nMemory=512 \\\nmk";
+    expect(ql082(text)).toEqual([]);
+  });
+});
+
+describe("QL083 duration format", () => {
+  /** Convenience: QL083 diagnostics present in a lint run. */
+  function ql083(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL083");
+  }
+
+  it("flags a bare number (systemd-style seconds, rejected by Go ParseDuration)", () => {
+    const diags = ql083("[Container]\nHealthInterval=30");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]!.severity).toBe("warning");
+  });
+
+  it("flags a systemd time unit that Go ParseDuration does not accept", () => {
+    expect(ql083("[Container]\nHealthInterval=5min")).toHaveLength(1);
+  });
+
+  it("flags the systemd literal 'infinity'", () => {
+    expect(ql083("[Container]\nHealthTimeout=infinity")).toHaveLength(1);
+  });
+
+  it("does not flag a simple Go duration", () => {
+    expect(ql083("[Container]\nHealthInterval=30s")).toEqual([]);
+  });
+
+  it("does not flag a compound Go duration", () => {
+    expect(ql083("[Container]\nHealthInterval=1m30s")).toEqual([]);
+  });
+
+  it("does not flag a fractional Go duration", () => {
+    expect(ql083("[Container]\nHealthInterval=1.5h")).toEqual([]);
+  });
+
+  it("does not flag a fractional value with no leading digit", () => {
+    expect(ql083("[Container]\nHealthStartupInterval=.5s")).toEqual([]);
+  });
+
+  it("does not flag a millisecond duration", () => {
+    expect(ql083("[Container]\nHealthStartPeriod=500ms")).toEqual([]);
+  });
+
+  it("does not flag the special literal 'disable' on an interval key", () => {
+    expect(ql083("[Container]\nHealthInterval=disable")).toEqual([]);
+  });
+
+  it("does not flag the special literal 'disable' on a timeout key", () => {
+    expect(ql083("[Container]\nHealthTimeout=disable")).toEqual([]);
+  });
+
+  it("does not flag a bare zero", () => {
+    expect(ql083("[Container]\nHealthInterval=0")).toEqual([]);
+  });
+
+  it("does not validate interpolated values", () => {
+    expect(ql083("[Container]\nHealthInterval=$IV")).toEqual([]);
+  });
+
+  it("does not flag an empty value", () => {
+    expect(ql083("[Container]\nHealthInterval=")).toEqual([]);
+  });
+
+  it("skips values that span a line continuation", () => {
+    const text = "[Container]\nHealthInterval=30 \\\ns";
+    expect(ql083(text)).toEqual([]);
+  });
+});
+
 describe("diagnostics are ordered and well-formed", () => {
   it("returns results in source order with 1-based positions", () => {
     const text = "badline\n[Oops]\nImage=a\nImage=b";
