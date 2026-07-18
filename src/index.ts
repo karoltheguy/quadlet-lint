@@ -25,6 +25,7 @@ import {
   expectedSectionFor,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
+import type { UnitIndex } from "./unit-index.js";
 
 export type Severity = "error" | "warning";
 
@@ -90,9 +91,15 @@ const DISABLE_NEXT_LINE_RE = /^#\s*quadlet-lint-disable-next-line\s+(QL\d{3})\b/
  * @param options.fileName Optional source file name, used to resolve the
  *   section a `.container`/`.pod`/etc. file (or a `.conf` drop-in) is
  *   expected to have, enabling the QL050 cross-checks.
+ * @param options.unitIndex Optional index of the other unit files seen in
+ *   this run, accepted for future cross-unit checks. It currently influences
+ *   no diagnostics.
  * @returns Diagnostics in source order (by line, then column).
  */
-export function lintQuadlet(text: string, options?: { fileName?: string }): Diagnostic[] {
+export function lintQuadlet(
+  text: string,
+  options?: { fileName?: string; unitIndex?: UnitIndex },
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const lines = text.split(/\r?\n/);
   const suppress = new Map<number, Set<string>>();

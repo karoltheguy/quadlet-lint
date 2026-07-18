@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { lintQuadlet, type Diagnostic } from "./index.js";
 import { expectedSectionFor } from "./sections.js";
+import { buildUnitIndex } from "./unit-index.js";
 
 /** Output format for CLI diagnostics. */
 export type OutputFormat = "text" | "json";
@@ -160,6 +161,11 @@ export function runLintPaths(
   const errors: string[] = [];
   let hasLintError = false;
 
+  // Built once, over every path in this run, so future cross-unit checks see
+  // the whole scanned set rather than just the file currently being linted.
+  // A single-file run simply gets a one-entry index.
+  const unitIndex = buildUnitIndex(paths);
+
   for (const path of paths) {
     let text: string;
     try {
@@ -169,7 +175,7 @@ export function runLintPaths(
       continue;
     }
 
-    const diagnostics = lintQuadlet(text, { fileName: path });
+    const diagnostics = lintQuadlet(text, { fileName: path, unitIndex });
     if (diagnostics.some((d) => d.severity === "error")) hasLintError = true;
 
     if (format === "json") {
