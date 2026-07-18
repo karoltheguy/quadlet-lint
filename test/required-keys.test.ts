@@ -132,6 +132,18 @@ describe("QL060 required key missing", () => {
     const text = "[Image]\nImage=quay.io/example/app:latest";
     expect(required(text, "base.image")).toEqual([]);
   });
+
+  it("does not flag [Container] with Image= when a [Service] section follows", () => {
+    const text =
+      "[Container]\nImage=quay.io/x\n\n[Service]\nRestart=always";
+    expect(required(text, "web.container")).toEqual([]);
+  });
+
+  it("does not flag when a repeated [Container] section satisfies the requirement in its first block", () => {
+    const text =
+      "[Container]\nImage=quay.io/x\n\n[Container]\nContainerName=web";
+    expect(required(text, "web.container")).toEqual([]);
+  });
 });
 
 describe("QL061 conditional requirement unmet", () => {
@@ -262,5 +274,16 @@ describe("QL061 conditional requirement unmet", () => {
   it("does not flag [Build] with SetWorkingDirectory=unit and no File=", () => {
     const text = "[Build]\nImageTag=my-image:latest\nSetWorkingDirectory=unit";
     expect(required(text, "img.build")).toEqual([]);
+  });
+
+  it("still flags [Volume] Driver=image with no Image= when a [Service] section follows", () => {
+    const text = "[Volume]\nDriver=image\n\n[Service]\nRestart=always";
+    const diags = required(text, "data.volume");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL061",
+      severity: "error",
+      line: 1,
+    });
   });
 });

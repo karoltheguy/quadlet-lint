@@ -25,6 +25,7 @@ import {
   expectedSectionFor,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
+import { SECTION_REFERENCES } from "./references.js";
 import type { UnitIndex } from "./unit-index.js";
 
 export type Severity = "error" | "warning";
@@ -72,6 +73,12 @@ export const Codes = {
   CONDITIONAL_REQUIREMENT: "QL061",
   /** Two keys in the same section that Quadlet's generator refuses to accept together. */
   CONFLICTING_KEYS: "QL070",
+  /**
+   * A key that references another unit file (Pod=, Network=, Volume=) whose
+   * target isn't among the files being linted. Only reported when the caller
+   * supplies a unit index.
+   */
+  CROSS_UNIT_REFERENCE: "QL090",
 } as const;
 
 /**
@@ -146,7 +153,11 @@ export function lintQuadlet(
    * never removed once a key has been assigned any value, including an empty
    * one, because Podman's presence-only checks (e.g. Volume's `Image=` under
    * `Driver=image`) key off whether the value was looked up at all, not its
-   * final content. Reset on each new section header alongside `seenKeys`.
+   * final content. Deliberately *not* reset on later section headers, unlike
+   * `seenKeys`: it must survive until the end-of-file QL060/QL061
+   * finalization below, and it accumulates last-wins across a repeated
+   * expected section the same way Podman's own parser merges repeated
+   * groups.
    */
   let reqLastValue = new Map<string, string>();
   let reqLastNonEmpty = new Map<string, boolean>();
@@ -154,6 +165,28 @@ export function lintQuadlet(
   /** Line number and raw text of the expected section's own header, for QL060/QL061 diagnostics. */
   let reqHeaderLine = 0;
   let reqHeaderRaw = "";
+  /**
+   * QL090 bookkeeping for last-wins reference keys (currently only Pod=):
+   * the most recent occurrence's value and position within the current
+   * section, last-wins like `reqLastValue`. Evaluated once at the same point
+   * QL060/QL061 finalize (end of the file's own expected section), since only
+   * the final value is the one Podman's generator actually resolves.
+   * Deliberately *not* reset on later section headers, so a repeated expected
+   * section accumulates last-wins across all its occurrences, matching how
+   * Podman's own parser merges repeated groups.
+   */
+  let refLastWinsSeen = new Map<string, { value: string; lineNo: number; keyStart: number; keyLen: number }>();
+  /** Pushes a QL090 diagnostic for an unresolved cross-unit reference. */
+  const reportMissingReference = (ref: string, line: number, keyStart: number, keyLen: number): void => {
+    diagnostics.push({
+      line,
+      startColumn: keyStart + 1,
+      endColumn: keyStart + keyLen + 1,
+      severity: "warning",
+      code: Codes.CROSS_UNIT_REFERENCE,
+      message: `Referenced unit '${ref}' was not found among the files being linted — it may exist elsewhere on the Quadlet search path.`,
+    });
+  };
   /**
    * When a value line ends with a backslash it continues onto the next
    * physical line(s). Those continuation lines are part of the value and must
@@ -194,9 +227,6 @@ export function lintQuadlet(
       seenKeys = new Map();
       seenConflictKeys = new Map();
       reportedConflictPairs = new Set();
-      reqLastValue = new Map();
-      reqLastNonEmpty = new Map();
-      reqSeenEver = new Set();
 
       const known = KNOWN_SECTIONS.has(name) || isUserDefinedSection(name);
       if (!known) {
@@ -289,6 +319,27 @@ export function lintQuadlet(
       reqLastValue.set(key, reqValue);
       reqLastNonEmpty.set(key, reqIsContinued || reqValue !== "");
       reqSeenEver.add(key);
+
+      // QL090: cross-unit reference checking, only when the caller supplied
+      // a unit index to check against. Multi-valued keys (Network=, Volume=)
+      // are checked per occurrence, immediately; the single-valued,
+      // last-wins Pod= is only recorded here and evaluated once at the end
+      // of the section (see the QL060/QL061 finalization block below), since
+      // only its final value is the one Podman's generator resolves.
+      if (options?.unitIndex !== undefined && !expected.isDropin) {
+        const referenceKeys = SECTION_REFERENCES[currentSection] ?? [];
+        for (const refKey of referenceKeys) {
+          if (refKey.key !== key) continue;
+          if (refKey.lastWins) {
+            refLastWinsSeen.set(key, { value: reqValue, lineNo, keyStart, keyLen: key.length });
+          } else {
+            const ref = refKey.extractRef(reqValue);
+            if (ref !== null && !options.unitIndex.has(ref)) {
+              reportMissingReference(ref, lineNo, keyStart, key.length);
+            }
+          }
+        }
+      }
     }
 
     // Unknown-key detection, restricted to the Quadlet-specific sections we
@@ -472,6 +523,21 @@ export function lintQuadlet(
           Codes.CONDITIONAL_REQUIREMENT,
           `When ${conditional.triggerDescription} is set in [${expected.section}], "${conditional.requiredKey}=" is also required. Quadlet fails to generate a service without it.`,
         );
+      }
+    }
+
+    // QL090 for last-wins reference keys (Pod=): only the final occurrence's
+    // value is the one Podman's generator actually resolves.
+    if (options?.unitIndex !== undefined) {
+      const referenceKeys = SECTION_REFERENCES[expected.section] ?? [];
+      for (const refKey of referenceKeys) {
+        if (!refKey.lastWins) continue;
+        const seen = refLastWinsSeen.get(refKey.key);
+        if (seen === undefined) continue;
+        const ref = refKey.extractRef(seen.value);
+        if (ref !== null && !options.unitIndex.has(ref)) {
+          reportMissingReference(ref, seen.lineNo, seen.keyStart, seen.keyLen);
+        }
       }
     }
   }
