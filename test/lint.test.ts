@@ -473,6 +473,68 @@ describe("QL070 conflicting / mutually exclusive keys", () => {
   });
 });
 
+describe("QL080 port-format", () => {
+  /** Convenience: QL080 diagnostics present in a lint run. */
+  function ql080(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL080");
+  }
+
+  it("flags a PublishPort= host port above the valid range", () => {
+    const diags = ql080("[Container]\nPublishPort=99999:80");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL080",
+      severity: "warning",
+    });
+  });
+
+  it("flags an ExposeHostPort= value above the valid range", () => {
+    const diags = ql080("[Container]\nExposeHostPort=70000");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({
+      code: "QL080",
+      severity: "warning",
+    });
+  });
+
+  it("does not flag a bare valid port", () => {
+    expect(ql080("[Container]\nPublishPort=65535")).toEqual([]);
+  });
+
+  it("does not flag a container:host mapping with a protocol suffix", () => {
+    expect(ql080("[Container]\nPublishPort=8080:80/tcp")).toEqual([]);
+  });
+
+  it("does not flag an IPv4-qualified mapping", () => {
+    expect(ql080("[Container]\nPublishPort=0.0.0.0:8080:80")).toEqual([]);
+  });
+
+  it("does not flag a bracketed IPv6 wildcard mapping", () => {
+    expect(ql080("[Container]\nPublishPort=[::0]:8080:80")).toEqual([]);
+  });
+
+  it("does not flag a bracketed IPv6 mapping with a protocol suffix", () => {
+    expect(ql080("[Container]\nPublishPort=[2001:db8::1]:8080:80/udp")).toEqual([]);
+  });
+
+  it("does not flag a port range mapping", () => {
+    expect(ql080("[Container]\nPublishPort=50-59:5000-5009")).toEqual([]);
+  });
+
+  it("does not validate interpolated values", () => {
+    expect(ql080("[Container]\nPublishPort=$PORT:80")).toEqual([]);
+  });
+
+  it("does not flag an empty value", () => {
+    expect(ql080("[Container]\nPublishPort=")).toEqual([]);
+  });
+
+  it("skips values that span a line continuation", () => {
+    const text = "[Container]\nPublishPort=99999:80 \\\n:81";
+    expect(ql080(text)).toEqual([]);
+  });
+});
+
 describe("diagnostics are ordered and well-formed", () => {
   it("returns results in source order with 1-based positions", () => {
     const text = "badline\n[Oops]\nImage=a\nImage=b";

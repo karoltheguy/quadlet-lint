@@ -23,10 +23,12 @@ import {
   getSectionRequirements,
   getConditionalRequirements,
   expectedSectionFor,
+  hasPortFormat,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
 import { SECTION_REFERENCES } from "./references.js";
 import type { UnitIndex } from "./unit-index.js";
+import { isMalformedPortValue } from "./ports.js";
 
 export type Severity = "error" | "warning";
 
@@ -62,6 +64,8 @@ export const Codes = {
   UNKNOWN_KEY: "QL030",
   /** A value outside the curated closed set of allowed values for its key. */
   ENUM_VALUE: "QL040",
+  /** A port-mapping value with a numeric field outside the valid 1-65535 port range. */
+  PORT_FORMAT: "QL080",
   /**
    * A file-specific Quadlet section that doesn't match the file's type, or
    * the expected section missing entirely.
@@ -360,21 +364,22 @@ export function lintQuadlet(
       });
     }
 
-    // Enum-value detection, restricted to keys we have a curated closed-set
-    // vocabulary for. The table is a hand-curated doc snapshot, not the
-    // authoritative Quadlet parser, so this stays a warning even when a value
-    // isn't recognized — it may simply be valid in a newer Podman version.
-    // Multi-line (continued) values are out of scope: we only ever see the
-    // first physical line's tail, which isn't the full value.
     if (!endsWithContinuation(raw)) {
+      const rawValue = raw.slice(eq + 1);
+      const value = rawValue.trim();
+      const hasInterpolation =
+        value.includes("$") || value.includes("`") || value.includes("%") || value.includes("{{");
+      const valueStart = eq + 1 + (rawValue.length - rawValue.trimStart().length);
+
+      // Enum-value detection, restricted to keys we have a curated closed-set
+      // vocabulary for. The table is a hand-curated doc snapshot, not the
+      // authoritative Quadlet parser, so this stays a warning even when a value
+      // isn't recognized — it may simply be valid in a newer Podman version.
+      // Multi-line (continued) values are out of scope: we only ever see the
+      // first physical line's tail, which isn't the full value.
       const allowed = getEnumValues(currentSection, key);
       if (allowed !== undefined) {
-        const rawValue = raw.slice(eq + 1);
-        const value = rawValue.trim();
-        const hasInterpolation =
-          value.includes("$") || value.includes("`") || value.includes("%") || value.includes("{{");
         if (value !== "" && !hasInterpolation && !allowed.has(value.toLowerCase())) {
-          const valueStart = eq + 1 + (rawValue.length - rawValue.trimStart().length);
           diagnostics.push({
             line: lineNo,
             startColumn: valueStart + 1,
@@ -382,6 +387,27 @@ export function lintQuadlet(
             severity: "warning",
             code: Codes.ENUM_VALUE,
             message: `Unrecognized value "${value}" for ${key}= — expected one of: ${[...allowed].join(", ")}. It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
+
+      // Malformed-port-value detection, restricted to keys documented as
+      // carrying a Podman port/port-range mapping. Reuses the same
+      // continuation/interpolation bypass discipline as QL040 above: a value
+      // ending in a line continuation is out of scope (we only ever see the
+      // first physical line's tail), and an interpolated value ($VAR, backtick
+      // command substitution, %specifier, or {{ templating}}, or an IPv6 zone
+      // ID's `%`) is never checked. Kept a warning since a value we flag may
+      // still be valid in a newer Podman version.
+      if (hasPortFormat(currentSection, key)) {
+        if (value !== "" && !hasInterpolation && isMalformedPortValue(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.PORT_FORMAT,
+            message: `Malformed port value "${value}" for ${key}= — port numbers must be between 1 and 65535. Expected form: ip:hostPort:containerPort (with optional /tcp or /udp). It may also be valid in a newer Podman version.`,
           });
         }
       }

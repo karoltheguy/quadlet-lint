@@ -13,6 +13,7 @@
 import { SECTION_KEYS } from "./generated/keys.js";
 import { SECTION_ENUMS } from "./enums.js";
 import { SECTION_CONFLICTS } from "./conflicts.js";
+import { PORT_FORMAT_KEYS } from "./ports.js";
 import {
   SECTION_REQUIRED,
   SECTION_CONDITIONAL,
@@ -85,6 +86,15 @@ export function getSectionKeys(section: string): ReadonlySet<string> | undefined
  */
 export function getEnumValues(section: string, key: string): ReadonlySet<string> | undefined {
   return SECTION_ENUMS[section]?.[key];
+}
+
+/**
+ * Whether `key` in `section` carries a Podman port-range mapping value (see
+ * {@link PORT_FORMAT_KEYS}), and is therefore a candidate for QL080
+ * malformed-port-value checking.
+ */
+export function hasPortFormat(section: string, key: string): boolean {
+  return PORT_FORMAT_KEYS[section]?.has(key) ?? false;
 }
 
 /**
