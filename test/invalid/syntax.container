@@ -1,0 +1,6 @@
+# QL002
+Image=someimage
+
+[Container]
+# QL001
+invalid_line_without_equal_sign

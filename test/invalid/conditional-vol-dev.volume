@@ -1,0 +1,4 @@
+# QL061
+[Volume]
+Type=tmpfs
+# Missing Device when Type=tmpfs

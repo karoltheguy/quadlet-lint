@@ -1,0 +1,6 @@
+[Unit]
+Description=Redis Service Runner
+
+[Container]
+Image=redis-custom:latest
+PublishPort=6379:6379

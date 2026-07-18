@@ -1,0 +1,10 @@
+[Unit]
+Description=Isolated Application Pod
+
+[Pod]
+PodName=isolated-pod
+PublishPort=8080:80
+Network=private-net.network
+
+[Install]
+WantedBy=default.target

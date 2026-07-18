@@ -1,0 +1,6 @@
+[Unit]
+Description=Database Persistent Volume
+
+[Volume]
+VolumeName=db-data
+Label=app=wordpress

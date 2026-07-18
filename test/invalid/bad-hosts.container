@@ -1,0 +1,4 @@
+[Container]
+Image=nginx
+# QL081
+AddHost=myhost-without-ip

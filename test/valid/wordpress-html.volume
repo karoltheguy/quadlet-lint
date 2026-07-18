@@ -1,0 +1,5 @@
+[Unit]
+Description=WordPress Public HTML Volume
+
+[Volume]
+VolumeName=wordpress-html

@@ -1,0 +1,4 @@
+[Container]
+Image=nginx
+# QL082
+Memory=512mk

@@ -1,0 +1,8 @@
+[Container]
+Image=nginx
+# QL090
+Pod=missing-pod.pod
+# QL090
+Network=missing-net.network
+# QL090
+Volume=missing-volume.volume:/data

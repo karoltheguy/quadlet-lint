@@ -1,0 +1,7 @@
+[Unit]
+Description=Template Database Instance for %i
+
+[Container]
+Image=docker.io/library/postgres:alpine
+Environment=POSTGRES_DB=%i
+Environment=POSTGRES_PASSWORD=postgres

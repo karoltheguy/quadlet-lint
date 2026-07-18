@@ -1,0 +1,10 @@
+[Unit]
+Description=WordPress Frontend Web Container
+
+[Container]
+Image=docker.io/library/wordpress:latest
+Environment=WORDPRESS_DB_HOST=127.0.0.1
+Environment=WORDPRESS_DB_PASSWORD=secret
+Pod=wordpress-stack.pod
+Network=wordpress-net.network
+Volume=wordpress-html.volume:/var/www/html

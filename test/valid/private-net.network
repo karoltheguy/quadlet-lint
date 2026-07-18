@@ -1,0 +1,9 @@
+[Unit]
+Description=Private Application Network
+
+[Network]
+NetworkName=private-net
+Subnet=10.88.0.0/16
+Gateway=10.88.0.1
+IPRange=10.88.1.0/24
+Internal=true

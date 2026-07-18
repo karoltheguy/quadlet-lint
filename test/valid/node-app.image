@@ -1,0 +1,5 @@
+[Unit]
+Description=Node Application Image Reference
+
+[Image]
+Image=docker.io/library/node:lts-alpine

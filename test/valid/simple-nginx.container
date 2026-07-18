@@ -1,0 +1,12 @@
+[Unit]
+Description=Simple Nginx Container
+After=network-online.target
+
+[Container]
+Image=docker.io/library/nginx:alpine
+PublishPort=80:80
+PublishPort=443:443
+ContainerName=nginx-frontend
+
+[Install]
+WantedBy=multi-user.target default.target

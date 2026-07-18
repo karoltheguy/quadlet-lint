@@ -1,0 +1,5 @@
+[Container]
+ContainerName=web-app
+# QL020
+ContainerName=web-app-backup
+Image=nginx

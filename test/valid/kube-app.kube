@@ -1,0 +1,10 @@
+[Unit]
+Description=Kubernetes Workload
+
+[Kube]
+Yaml=app.yaml
+Network=private-net.network
+PublishPort=80:80
+
+[Install]
+WantedBy=default.target

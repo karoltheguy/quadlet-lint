@@ -1,0 +1,6 @@
+[Unit]
+Description=Build custom Redis image
+
+[Build]
+ImageTag=redis-custom:latest
+File=Redis.Containerfile

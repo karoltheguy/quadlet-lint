@@ -1,0 +1,7 @@
+[Unit]
+Description=Build Node Application
+
+[Build]
+ImageTag=node-app:latest
+File=Containerfile
+SetWorkingDirectory=file

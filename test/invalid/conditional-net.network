@@ -1,0 +1,4 @@
+# QL061
+[Network]
+Gateway=10.0.0.1
+# Missing Subnet when Gateway is set

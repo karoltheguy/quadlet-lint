@@ -1,0 +1,8 @@
+[Unit]
+Description=WordPress Application Pod
+
+[Pod]
+PodName=wordpress-pod
+PublishPort=80:80
+Network=wordpress-net.network
+Volume=wordpress-html.volume:/var/www/html

@@ -1,0 +1,4 @@
+[Container]
+Image=nginx
+# QL070
+Rootfs=/path/to/rootfs

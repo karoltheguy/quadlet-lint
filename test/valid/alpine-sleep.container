@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpine Sleep Container
+
+[Container]
+Image=docker.io/library/alpine:latest
+Exec=sleep 1000
+Environment=FOO=bar
+Environment=BAZ=qux
+AutoUpdate=registry
+
+[Install]
+WantedBy=default.target

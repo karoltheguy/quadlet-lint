@@ -1,0 +1,5 @@
+[Container]
+Image=nginx
+ReloadCmd=kill -SIGHUP 1
+# QL070
+ReloadSignal=SIGHUP

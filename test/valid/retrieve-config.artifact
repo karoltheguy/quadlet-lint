@@ -1,0 +1,5 @@
+[Unit]
+Description=Retrieve Configuration Artifact
+
+[Artifact]
+Artifact=https://example.com/config.tar.gz

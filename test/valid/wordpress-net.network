@@ -1,0 +1,6 @@
+[Unit]
+Description=WordPress Bridge Network
+
+[Network]
+NetworkName=wordpress-net
+Internal=false

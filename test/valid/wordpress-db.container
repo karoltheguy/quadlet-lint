@@ -1,0 +1,9 @@
+[Unit]
+Description=WordPress Database Container
+
+[Container]
+Image=docker.io/library/mariadb:10.11
+Environment=MYSQL_ROOT_PASSWORD=secret
+Environment=MYSQL_DATABASE=wordpress
+Pod=wordpress-stack.pod
+Volume=wordpress-db-data.volume:/var/lib/mysql
