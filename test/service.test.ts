@@ -4,10 +4,12 @@ import {
   getCompletions,
   getQuickFixes,
   lintQuadlet,
+  SECTION_SKELETONS,
   type HoverInfo,
   type CompletionItem,
 } from "../src/service.js";
 import type { Diagnostic } from "../src/index.js";
+import { FILE_TYPE_SECTIONS, isKnownKey } from "../src/sections.js";
 
 const ADD_HOST_DESCRIPTION = "Add host-to-IP mapping to /etc/hosts. The format is `hostname:ip`.";
 const IMAGE_DESCRIPTION =
@@ -387,5 +389,71 @@ describe("systemd section completions and hover", () => {
     const diags = lintQuadlet(text);
     const unknownKeyDiags = diags.filter((d: Diagnostic) => d.code === "QL030");
     expect(unknownKeyDiags).toEqual([]);
+  });
+});
+
+describe("snippet completions", () => {
+  type WithSnippet = { label: string; snippet?: string };
+
+  it("carries a snippet for a key completion that inserts '=' and a caret tabstop", () => {
+    const text = "[Container]\n";
+    const items = getCompletions(text, { line: 2, column: 1 }) as WithSnippet[];
+    const item = items.find((i) => i.label === "Image");
+    expect(item).toBeDefined();
+    expect(item?.snippet).toBe("Image=$0");
+  });
+
+  it("offers a section-skeleton snippet on a fresh line for the file's type", () => {
+    const items = getCompletions("", { line: 1, column: 1 }, "web.container") as WithSnippet[];
+    const found = items.some((i) => i.snippet === "[Container]\nImage=$0");
+    expect(found).toBe(true);
+  });
+
+  it("does not offer the section-skeleton snippet after the user has already typed '['", () => {
+    const items = getCompletions("[", { line: 1, column: 2 }, "web.container") as WithSnippet[];
+    const found = items.some((i) => typeof i.snippet === "string" && i.snippet.includes("\n"));
+    expect(found).toBe(false);
+  });
+
+  it("keeps enum value completions plain, without a snippet", () => {
+    const text = "[Container]\nPull=";
+    const items = getCompletions(text, { line: 2, column: 6 }) as WithSnippet[];
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item.snippet).toBeUndefined();
+    }
+  });
+});
+
+describe("SECTION_SKELETONS table", () => {
+  it("covers every file-type section", () => {
+    for (const section of FILE_TYPE_SECTIONS) {
+      expect(SECTION_SKELETONS[section]).toBeDefined();
+    }
+  });
+
+  it("has each snippet's header line match its table key", () => {
+    for (const [section, snippet] of Object.entries(SECTION_SKELETONS)) {
+      expect(snippet.startsWith(`[${section}]`)).toBe(true);
+    }
+  });
+
+  it("has a known seed key on the second line, when present", () => {
+    for (const [section, snippet] of Object.entries(SECTION_SKELETONS)) {
+      const lines = snippet.split("\n");
+      const secondLine = lines[1] ?? "";
+      const match = /^([A-Za-z0-9]+)=/.exec(secondLine);
+      if (match) {
+        const key = match[1]!;
+        expect(isKnownKey(section, key)).toBe(true);
+      }
+    }
+  });
+
+  it("has exactly one caret tabstop per snippet", () => {
+    for (const snippet of Object.values(SECTION_SKELETONS)) {
+      const matches = snippet.match(/\$0/g) ?? [];
+      expect(matches.length).toBe(1);
+    }
   });
 });

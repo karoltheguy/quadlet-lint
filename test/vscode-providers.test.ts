@@ -31,6 +31,10 @@ class FakeMarkdownString {
   constructor(public value: string) {}
 }
 
+class FakeSnippetString {
+  constructor(public value: string) {}
+}
+
 class FakeCodeAction {
   diagnostics: unknown[] | undefined;
   edit: unknown;
@@ -61,6 +65,7 @@ function fakeVscode() {
     CompletionItem: FakeCompletionItem,
     Hover: FakeHover,
     MarkdownString: FakeMarkdownString,
+    SnippetString: FakeSnippetString,
     CodeAction: FakeCodeAction,
     CodeActionKind,
     WorkspaceEdit: FakeWorkspaceEdit,
@@ -88,6 +93,10 @@ describe("createCompletionProvider", () => {
         expect((result[i] as any).detail).toBe(expected[i]!.detail);
       }
     }
+
+    const imageItem = result.find((i: any) => i.label === "Image") as any;
+    expect(imageItem.insertText).toBeInstanceOf(FakeSnippetString);
+    expect((imageItem.insertText as FakeSnippetString).value).toBe("Image=$0");
   });
 });
 

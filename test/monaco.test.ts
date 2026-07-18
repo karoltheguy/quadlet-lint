@@ -14,6 +14,8 @@ const MarkerSeverity = { Error: 8, Warning: 4 } as const;
 
 const CompletionItemKind = { Property: 9, Value: 12 } as const;
 
+const CompletionItemInsertTextRule = { InsertAsSnippet: 4 } as const;
+
 function fakeMonaco(setModelMarkers = vi.fn()) {
   return {
     MarkerSeverity,
@@ -23,6 +25,7 @@ function fakeMonaco(setModelMarkers = vi.fn()) {
       registerHoverProvider: vi.fn(),
       registerCodeActionProvider: vi.fn(),
       CompletionItemKind,
+      CompletionItemInsertTextRule,
     },
   } as any;
 }
@@ -122,8 +125,11 @@ describe("registerCompletionProvider", () => {
       expect(suggestion.range.endLineNumber).toBe(2);
       expect(suggestion.range.startColumn).toBe(1);
       expect(suggestion.range.endColumn).toBe(1);
-      expect(suggestion.insertText).toBe(suggestion.label);
     }
+
+    const imageSuggestion = result.suggestions.find((s: any) => s.label === "Image");
+    expect(imageSuggestion.insertText).toBe("Image=$0");
+    expect(imageSuggestion.insertTextRules).toBe(CompletionItemInsertTextRule.InsertAsSnippet);
   });
 
   it("threads the model's fileName through to filter section suggestions", () => {
@@ -141,6 +147,10 @@ describe("registerCompletionProvider", () => {
     const labels = result.suggestions.map((s: any) => s.label);
     expect(labels).toContain("Container");
     expect(labels).not.toContain("Pod");
+
+    const containerSuggestion = result.suggestions.find((s: any) => s.label === "Container");
+    expect(containerSuggestion.insertText).toBe("Container");
+    expect(containerSuggestion.insertTextRules).toBeUndefined();
   });
 });
 

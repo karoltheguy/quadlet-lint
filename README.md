@@ -119,7 +119,7 @@ registerHoverProvider(monaco, "ini");
 registerCodeActionProvider(monaco, "ini");
 ```
 
-Completions are file-type aware when the model's URI has a Quadlet extension (e.g. `web.container` won't suggest `[Pod]`).
+Completions are file-type aware when the model's URI has a Quadlet extension (e.g. `web.container` won't suggest `[Pod]`). They're also snippet-style: accepting a key inserts the `=` and places the caret after it, and on a fresh line a file's own type offers a starter skeleton (e.g. a `.container` file suggests a `[Container]` block seeded with `Image=`). The service layer exposes these as an editor-neutral `snippet` field, which the Monaco and VS Code adapters translate to their respective snippet APIs.
 
 Key completions and hover also cover the standard systemd sections (`[Unit]`, `[Service]`, `[Install]`) with the directives from their man pages, the most common ones with hover documentation. This is editor convenience only: keys in those sections are never validated, so an uncommon systemd directive is still accepted silently.
 

@@ -53,9 +53,10 @@ export interface VscodeLike {
     endChar: number,
   ) => unknown;
   Position: new (line: number, character: number) => unknown;
-  CompletionItem: new (label: string) => { label: string; detail?: string };
+  CompletionItem: new (label: string) => { label: string; detail?: string; insertText?: unknown };
   Hover: new (contents: unknown) => unknown;
   MarkdownString: new (value: string) => unknown;
+  SnippetString: new (value: string) => unknown;
   CodeAction: new (
     title: string,
     kind: unknown,
@@ -113,6 +114,9 @@ export function createCompletionProvider(vscodeNs: VscodeLike): CompletionProvid
         const completionItem = new vscodeNs.CompletionItem(item.label);
         if (item.detail !== undefined) {
           completionItem.detail = item.detail;
+        }
+        if (item.snippet !== undefined) {
+          completionItem.insertText = new vscodeNs.SnippetString(item.snippet);
         }
         return completionItem;
       });

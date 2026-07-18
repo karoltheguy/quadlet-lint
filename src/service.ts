@@ -46,6 +46,8 @@ export interface TextEdit {
 export interface CompletionItem {
   label: string;
   detail?: string;
+  /** LSP/TextMate snippet body (e.g. `Image=$0`); when set, adapters insert it as a snippet instead of the plain label. */
+  snippet?: string;
 }
 
 /** Hover information for the key under the cursor. */
@@ -200,7 +202,7 @@ export function getCompletions(
   const trimmedBefore = beforeCursor.trim();
 
   if (trimmedBefore === "") {
-    if (currentSection === null) return sectionCompletions(fileName);
+    if (currentSection === null) return sectionCompletions(fileName, true);
     if (hasKeyData(currentSection)) return keyCompletions(currentSection);
     if (hasSystemdKeyData(currentSection)) return systemdKeyCompletions(currentSection);
     return [];
@@ -230,7 +232,30 @@ export function getCompletions(
   return [];
 }
 
-function sectionCompletions(fileName?: string): CompletionItem[] {
+/** Escapes TextMate/LSP snippet metacharacters. Keys are simple identifiers today; this is safe-by-construction. */
+function escapeSnippet(text: string): string {
+  return text.replace(/[\\$}]/g, (c) => "\\" + c);
+}
+
+/**
+ * Starter-skeleton snippets offered per file-type section on a fresh line.
+ * Seed keys are the section's required/conventional first key (Kube/Build/Image
+ * required; Container's Image is the conventional member of the
+ * Image/Rootfs one-of); sections with no unconditional required key get a
+ * header + caret only.
+ */
+export const SECTION_SKELETONS: Readonly<Record<string, string>> = {
+  Container: "[Container]\nImage=$0",
+  Pod: "[Pod]\n$0",
+  Network: "[Network]\n$0",
+  Volume: "[Volume]\n$0",
+  Kube: "[Kube]\nYaml=$0",
+  Build: "[Build]\nImageTag=$0",
+  Image: "[Image]\nImage=$0",
+  Artifact: "[Artifact]\n$0",
+};
+
+function sectionCompletions(fileName?: string, includeSkeleton = false): CompletionItem[] {
   let expected: string | null = null;
   if (fileName) {
     const exp = expectedSectionFor(fileName);
@@ -238,6 +263,9 @@ function sectionCompletions(fileName?: string): CompletionItem[] {
   }
 
   const items: CompletionItem[] = [];
+  if (includeSkeleton && expected !== null && SECTION_SKELETONS[expected]) {
+    items.push({ label: `[${expected}] (skeleton)`, snippet: SECTION_SKELETONS[expected] });
+  }
   for (const name of KNOWN_SECTIONS) {
     if (expected !== null && FILE_TYPE_SECTIONS.has(name) && name !== expected) continue;
     items.push({ label: name });
@@ -248,13 +276,13 @@ function sectionCompletions(fileName?: string): CompletionItem[] {
 function keyCompletions(section: string): CompletionItem[] {
   const keys = getSectionKeys(section);
   if (!keys) return [];
-  return [...keys].map((label) => ({ label }));
+  return [...keys].map((label) => ({ label, snippet: `${escapeSnippet(label)}=$0` }));
 }
 
 function systemdKeyCompletions(section: string): CompletionItem[] {
   const keys = getSystemdSectionKeys(section);
   if (!keys) return [];
-  return [...keys].map((label) => ({ label }));
+  return [...keys].map((label) => ({ label, snippet: `${escapeSnippet(label)}=$0` }));
 }
 
 /** A single suggested fix for a diagnostic, expressed as a set of text edits. */

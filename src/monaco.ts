@@ -30,6 +30,7 @@ export interface MonacoLike {
     | "registerHoverProvider"
     | "registerCodeActionProvider"
     | "CompletionItemKind"
+    | "CompletionItemInsertTextRule"
   >;
 }
 
@@ -123,7 +124,10 @@ export function registerCompletionProvider(
       const suggestions = items.map((item) => ({
         label: item.label,
         kind: monacoNs.languages.CompletionItemKind.Property,
-        insertText: item.label,
+        insertText: item.snippet ?? item.label,
+        ...(item.snippet !== undefined
+          ? { insertTextRules: monacoNs.languages.CompletionItemInsertTextRule.InsertAsSnippet }
+          : {}),
         range,
       }));
       return { suggestions };
