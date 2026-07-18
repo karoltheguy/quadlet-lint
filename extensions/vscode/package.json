@@ -5,6 +5,7 @@
   "publisher": "karoltheguy",
   "displayName": "Quadlet Lint",
   "description": "Linting, completions, hover documentation, and quick fixes for Podman Quadlet unit files.",
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/karoltheguy/quadlet-lint"
