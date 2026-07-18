@@ -69,6 +69,16 @@ export const SECTION_REQUIRED: Readonly<Record<string, SectionRequirements>> = {
       },
     ],
   },
+  Image: {
+    plain: [
+      {
+        // source: podman pkg/systemd/quadlet/quadlet.go, ConvertImage:
+        // imageName, ok := image.Lookup(ImageGroup, KeyImage); if !ok || len(imageName) == 0
+        // -> fmt.Errorf("no Image key specified")
+        key: "Image",
+      },
+    ],
+  },
 };
 
 /**
@@ -105,6 +115,45 @@ export const SECTION_CONDITIONAL: Readonly<Record<string, readonly ConditionalRe
       requiredKey: "Image",
       // Go only checks `!ok` (was the key looked up at all), never the
       // length of the value, so a present-but-empty Image= satisfies this.
+      presenceOnly: true,
+    },
+    {
+      // source: podman pkg/systemd/quadlet/quadlet.go, ConvertVolume: the
+      // Type lookup (`ok && len(devType) != 0`) sits in the else-branch of
+      // `if driver == "image"`, so under Driver=image (exact, case-sensitive
+      // Go `==`) this check is never reached; otherwise a non-empty Type
+      // without a non-empty Device -> fmt.Errorf("key Type can't be used
+      // without Device")
+      triggerDescription: "Type= without Driver=image",
+      triggers: (lastValue, lastNonEmpty) =>
+        lastNonEmpty.get("Type") === true && lastValue.get("Driver") !== "image",
+      requiredKey: "Device",
+      presenceOnly: false,
+    },
+  ],
+  Container: [
+    {
+      // source: podman pkg/systemd/quadlet/quadlet.go, handleUser (called
+      // from ConvertContainer): okUser := hasUser && len(user) > 0; a
+      // non-empty Group with an absent-or-empty User
+      // -> fmt.Errorf("invalid Group set without User")
+      triggerDescription: "Group=",
+      triggers: (_lastValue, lastNonEmpty) => lastNonEmpty.get("Group") === true,
+      requiredKey: "User",
+      presenceOnly: false,
+    },
+  ],
+  Build: [
+    {
+      // source: podman pkg/systemd/quadlet/quadlet.go,
+      // handleSetWorkingDirectory (called from ConvertBuild):
+      // switch strings.ToLower(setWorkingDirectory) { case "file": ...
+      //   Lookup(quadletGroup, KeyFile); if !ok -> fmt.Errorf("no File key specified") }
+      // The value match is case-insensitive because Go lowercases it first;
+      // the lookup itself only checks `!ok`, so it is presence-only.
+      triggerDescription: "SetWorkingDirectory=file",
+      triggers: (lastValue) => (lastValue.get("SetWorkingDirectory") ?? "").toLowerCase() === "file",
+      requiredKey: "File",
       presenceOnly: true,
     },
   ],
