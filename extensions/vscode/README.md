@@ -59,6 +59,8 @@ Add a `# quadlet-lint-disable-next-line QLxxx` comment to silence a specific cod
 Want to see it before installing? The linter runs in your browser in the
 [**live demo**](https://karoltheguy.github.io/quadlet-lint/), same engine, no install required.
 
+*The same engine also powers live linting in [QuadletManager](https://github.com/karoltheguy/QuadletManager).*
+
 ## Feedback
 
 Found a false positive or a missing check? [Open an issue](https://github.com/karoltheguy/quadlet-lint/issues). The zero-false-error goal depends on it.

@@ -9,6 +9,8 @@ Quadlet files are systemd units, and the authoritative check will always be `pod
 
 Anything it reports as an `error` would genuinely fail systemd/Quadlet; anything uncertain is at most a `warning`. It is convenience feedback.
 
+*The same engine also powers live linting in [QuadletManager](https://github.com/karoltheguy/QuadletManager).*
+
 > **Status:** the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode) is published and public on the Marketplace (see [VS Code usage](#vs-code-usage)). The npm package is not yet published: the commands below (`npm install quadlet-lint`, `npx quadlet-lint`) are how the core, Monaco adapter, and CLI will be consumed once a first version ships to npm. For now, clone the repo and build locally (see [Development](#development)).
 
 ## Install
