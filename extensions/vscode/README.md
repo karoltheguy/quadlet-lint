@@ -1,7 +1,7 @@
 # Quadlet Lint for VS Code
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/karoltheguy.quadlet-lint-vscode?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/karoltheguy.quadlet-lint-vscode)](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode)
+[![Version](https://vsmarketplacebadges.dev/version-short/karoltheguy.quadlet-lint-vscode.png?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/karoltheguy.quadlet-lint-vscode.png)](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode)
 
 Fast, dependency-free linting for Podman [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) unit files, with completions, hover documentation, and quick fixes as you type.
 

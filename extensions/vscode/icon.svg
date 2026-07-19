@@ -5,6 +5,9 @@
    id="svg2"
    sodipodi:docname="icon.svg"
    inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   inkscape:export-filename="icon.png"
+   inkscape:export-xdpi="768"
+   inkscape:export-ydpi="768"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -52,8 +55,8 @@
      fill="url(#g)"
      id="rect2" />
   <text
-     x="16.084415"
-     y="16.471003"
+     x="16.222946"
+     y="16.554121"
      dominant-baseline="central"
      text-anchor="middle"
      font-family="sans-serif"
