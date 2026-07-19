@@ -53,8 +53,16 @@ jobs:
         working-directory: extensions/vscode
 
       - name: Package VS Code extension (.vsix)
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           cd extensions/vscode
+          # Derive the version as <major>.<minor> from package.json plus the
+          # workflow run number as the build/patch component, so every build
+          # produces a unique, increasing version (e.g. 0.0.1 -> 0.0.<run#>).
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          VERSION="$BASE.$RUN_NUMBER"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
           npx @vscode/vsce package --allow-missing-repository --no-dependencies
           mv *.vsix ../../build-artifacts/
 

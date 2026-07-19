@@ -9,7 +9,7 @@ Quadlet files are systemd units, and the authoritative check will always be `pod
 
 Anything it reports as an `error` would genuinely fail systemd/Quadlet; anything uncertain is at most a `warning`. It is convenience feedback.
 
-> **Status:** not yet published. The commands below (`npm install quadlet-lint`, `npx quadlet-lint`) are how this will be consumed once a first version ships to npm. For now, clone the repo and build locally (see [Development](#development)). The VS Code extension is fully built but unpublished and marked private; install it as a locally-built `.vsix` (see [VS Code usage](#vs-code-usage)).
+> **Status:** the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode) is published and public on the Marketplace (see [VS Code usage](#vs-code-usage)). The npm package is not yet published: the commands below (`npm install quadlet-lint`, `npx quadlet-lint`) are how the core, Monaco adapter, and CLI will be consumed once a first version ships to npm. For now, clone the repo and build locally (see [Development](#development)).
 
 ## Install
 
@@ -127,7 +127,13 @@ Key completions and hover also cover the standard systemd sections (`[Unit]`, `[
 
 A VS Code extension is in [`extensions/vscode`](extensions/vscode), built on the same service layer as the Monaco adapter: diagnostics, completions, hover documentation, and quick fixes, plus a TextMate grammar and language configuration for `.container`/`.pod`/`.network`/`.volume`/`.kube`/`.build`/`.image`/`.artifact` files.
 
-It isn't published to the Marketplace yet, so package and install it locally:
+Install **Quadlet Lint** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode), or from a terminal:
+
+```sh
+code --install-extension karoltheguy.quadlet-lint-vscode
+```
+
+To build and install it locally from source instead:
 
 ```sh
 npm run package:vscode
