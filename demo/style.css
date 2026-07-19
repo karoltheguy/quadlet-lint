@@ -57,16 +57,8 @@ header {
 }
 
 .logo-icon {
-  background: var(--logo-gradient);
   width: 2rem;
   height: 2rem;
-  border-radius: var(--border-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: #eff0f1;
 }
 
 .logo-text h1 {
@@ -98,6 +90,30 @@ header {
 .header-links a:hover {
   background: #3a3f44;
   border-color: #606872;
+}
+
+.marketplace-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--border-radius);
+  background: #3a3f44;
+  border: 1px solid #4d545c;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.marketplace-link:hover,
+.marketplace-link:focus-visible {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #232629;
+  text-decoration: none;
+  outline: none;
 }
 
 main {
@@ -316,7 +332,7 @@ main {
   border: 1px solid rgba(253, 188, 75, 0.2);
 }
 
-.guide-badge.local {
+.guide-badge.vscode {
   color: var(--accent);
   background: var(--accent-glow);
   border: 1px solid rgba(61, 174, 233, 0.2);
@@ -384,8 +400,6 @@ main {
   width: 1.15rem;
   height: 1.15rem;
   border-radius: var(--border-radius);
-  background: var(--logo-gradient);
-  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.6rem;

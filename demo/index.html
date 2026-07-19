@@ -17,10 +17,10 @@
   <body>
     <header>
       <div class="logo-container">
-        <div class="logo-icon">Q</div>
+        <img class="logo-icon" src="./favicon.svg" alt="quadlet-lint logo" />
         <div class="logo-text">
           <h1>quadlet-lint</h1>
-          <p>Instant, as-you-type linting for Podman Quadlet files</p>
+          <p>As-you-type linting for Podman Quadlet files</p>
         </div>
       </div>
       <div class="header-links">
@@ -186,12 +186,20 @@
           <div class="guide-section">
             <div class="guide-header-container">
               <h3>VS Code Extension</h3>
-              <span class="guide-badge local">Local Build</span>
+              <span class="guide-badge vscode">VS Code</span>
             </div>
-            <p style="font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Package and install the extension for syntax highlighting and direct lint warnings:</p>
-            <div class="guide-code">npm run package:vscode</div>
+            <p style="font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Install directly from within VS Code:</p>
+            <div class="guide-code">ext install karoltheguy.quadlet-lint-vscode</div>
             <p style="font-size: 0.75rem; margin-top: 0.4rem; color: var(--text-secondary); font-style: italic;">
-              * Note: Build the package locally into a .vsix file, then install it in VS Code via "Install from VSIX".
+              <a
+                href="https://marketplace.visualstudio.com/items?itemName=karoltheguy.quadlet-lint-vscode"
+                class="marketplace-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the quadlet-lint extension on the VS Code Marketplace"
+              >
+                View on the VS Code Marketplace
+              </a>
             </p>
           </div>
         </div>
@@ -203,10 +211,10 @@
           <!-- KDE Plasma 6 Titlebar -->
           <div class="titlebar">
             <div class="titlebar-left">
-              <div class="titlebar-app-icon">Q</div>
+              <img class="titlebar-app-icon" src="./favicon.svg" alt="quadlet-lint logo" />
             </div>
             <div class="titlebar-center">
-              <span id="titlebar-filename">demo.container</span> — Kate
+              <span id="titlebar-filename">demo.container</span>
             </div>
             <div class="titlebar-right">
               <button class="titlebar-action-btn minimize" aria-label="Minimize">
