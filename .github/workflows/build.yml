@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+# Serialize entire workflow runs per-ref (not just the build job) so runs
+# queue and publish in trigger order on main, instead of two builds racing
+# to reach the publish step and finishing out of order. PR runs get their
+# own group per-ref and never queue behind main, and stale PR runs are
+# canceled on a new push; main runs are never canceled mid-publish.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -30,10 +39,7 @@ jobs:
         run: npm run typecheck
 
       - name: Run tests with coverage
-        run: |
-          VITEST_VERSION=$(node -p "require('vitest/package.json').version")
-          npm install --no-save "@vitest/coverage-v8@$VITEST_VERSION"
-          npx vitest run --coverage
+        run: npx vitest run --coverage
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -46,13 +52,12 @@ jobs:
     # VS Code extension .vsix are never built or published on a failing test run.
     needs: test
     runs-on: ubuntu-latest
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, needed for git rev-list --count below
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -81,17 +86,18 @@ jobs:
         working-directory: extensions/vscode
 
       - name: Package VS Code extension (.vsix)
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
         run: |
           cd extensions/vscode
           # Derive the version as <major>.<minor> from package.json plus the
-          # workflow run number as the build/patch component, so every build
-          # produces a unique, increasing version (e.g. 0.0.1 -> 0.0.<run#>).
+          # commit count on main as the build/patch component, so every build
+          # produces a unique, increasing version (e.g. 0.0.1 -> 0.0.<count>).
+          # Commit count is used instead of github.run_number because it's
+          # reproducible from the repo itself and survives workflow renames.
           BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          VERSION="$BASE.$RUN_NUMBER"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          VERSION="$BASE.$COMMIT_COUNT"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
-          npx @vscode/vsce package --allow-missing-repository --no-dependencies
+          npx @vscode/vsce package --no-dependencies
           mv *.vsix ../../build-artifacts/
 
       - name: Upload Build Artifacts
@@ -103,12 +109,16 @@ jobs:
 
       - name: Publish to VS Code Marketplace
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VSCE_PAT != ''
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           VSIX=$(ls build-artifacts/*.vsix)
           npx @vscode/vsce publish --packagePath "$VSIX" -p "$VSCE_PAT"
 
       - name: Publish to Open VSX
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.OVSX_PAT != ''
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           VSIX=$(ls build-artifacts/*.vsix)
           npx ovsx publish "$VSIX" -p "$OVSX_PAT"

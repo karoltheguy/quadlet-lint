@@ -43,7 +43,7 @@ jobs:
       - name: Build Demo
         env:
           VITE_ANALYTICS_SITE_ID: ${{ secrets.VITE_ANALYTICS_SITE_ID }}
-        run: npx vite build demo --base=./ --outDir dist-demo
+        run: npm run build:demo
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

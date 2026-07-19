@@ -3,11 +3,19 @@ name: Publish to npm
 # Publishes the quadlet-lint package (core + Monaco/service adapters + CLI) to
 # the npm registry. Triggered when a GitHub Release is published, so the version
 # is always a deliberate, semver-meaningful choice rather than a per-commit bump.
-# The workflow_dispatch entry allows a manual re-run from the Actions tab.
+# The workflow_dispatch entry allows a manual re-run (e.g. retrying a release
+# whose publish step failed) and requires the same release tag as input, so it
+# checks out and verifies that exact tag rather than publishing an
+# untagged/unreviewed state of whichever branch happens to be selected.
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.2.3) — must match an existing GitHub Release and package.json version at that tag'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,8 +26,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate tag input
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG_INPUT" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag '$TAG_INPUT': expected a semver tag like v1.2.3." >&2
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,13 +52,12 @@ jobs:
         run: npm ci
 
       - name: Verify release tag matches package.json version
-        if: github.event_name == 'release'
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
           if [ "$RELEASE_TAG" != "$PKG_VERSION" ]; then
-            echo "Release tag '$RELEASE_TAG' does not match package.json version '$PKG_VERSION'." >&2
+            echo "Release tag '$RELEASE_TAG' does not match package.json version '$PKG_VERSION' at this ref." >&2
             echo "Bump the version in package.json and tag the release to match (e.g. $PKG_VERSION)." >&2
             exit 1
           fi
