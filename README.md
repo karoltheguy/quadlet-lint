@@ -229,3 +229,7 @@ npm run build
 npm run demo #just to try it out
 npm run package:vscode 
 ```
+
+## Versioning
+
+The npm package and the VS Code extension always publish an identical version of the form `<major>.<minor>.<build>`. The `<major>.<minor>` base is the single source of truth in the root [`package.json`](package.json); the `<build>` component is generated automatically in CI as the repository commit count (`git rev-list --count HEAD`), so **it is a build number, not a semver patch**. It increases monotonically across the whole history and does not reset when the base is bumped (e.g. `0.1.90` → base bump → `0.2.91`). To start a new minor line, bump `<major>.<minor>` in the root `package.json`; the build number keeps advancing on its own.

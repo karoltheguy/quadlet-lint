@@ -1,7 +1,7 @@
 {
   "name": "quadlet-lint-vscode",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "karoltheguy",
   "displayName": "Quadlet Lint",
   "description": "Linting, completions, hover documentation, and quick fixes for Podman Quadlet unit files.",

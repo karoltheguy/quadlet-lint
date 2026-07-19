@@ -87,14 +87,15 @@ jobs:
 
       - name: Package VS Code extension (.vsix)
         run: |
-          cd extensions/vscode
-          # Derive the version as <major>.<minor> from package.json plus the
+          # Derive the version as <major>.<minor> from the ROOT package.json
+          # (the single source of truth, shared with the npm publish) plus the
           # commit count on main as the build/patch component, so every build
-          # produces a unique, increasing version (e.g. 0.0.1 -> 0.0.<count>).
-          # Commit count is used instead of github.run_number because it's
-          # reproducible from the repo itself and survives workflow renames.
+          # produces a unique, increasing version identical to the npm one
+          # (e.g. 0.1.<count>). Commit count is used instead of github.run_number
+          # because it's reproducible from the repo itself and survives workflow renames.
           BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
           COMMIT_COUNT=$(git rev-list --count HEAD)
+          cd extensions/vscode
           VERSION="$BASE.$COMMIT_COUNT"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npx @vscode/vsce package --no-dependencies
