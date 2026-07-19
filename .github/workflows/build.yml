@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,6 +34,34 @@ jobs:
           VITEST_VERSION=$(node -p "require('vitest/package.json').version")
           npm install --no-save "@vitest/coverage-v8@$VITEST_VERSION"
           npx vitest run --coverage
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: karoltheguy/quadlet-lint
+
+  build:
+    # Only starts once the test job has succeeded, so the npm module and the
+    # VS Code extension .vsix are never built or published on a failing test run.
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build Core, Monaco, and CLI
         run: npm run build
@@ -72,9 +100,15 @@ jobs:
           name: quadlet-lint-builds
           path: build-artifacts/
           if-no-files-found: error
-      
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: karoltheguy/quadlet-lint
+
+      - name: Publish to VS Code Marketplace
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VSCE_PAT != ''
+        run: |
+          VSIX=$(ls build-artifacts/*.vsix)
+          npx @vscode/vsce publish --packagePath "$VSIX" -p "$VSCE_PAT"
+
+      - name: Publish to Open VSX
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.OVSX_PAT != ''
+        run: |
+          VSIX=$(ls build-artifacts/*.vsix)
+          npx ovsx publish "$VSIX" -p "$OVSX_PAT"
