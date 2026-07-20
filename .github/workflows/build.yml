@@ -66,7 +66,11 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org' # points npm publish at the public registry
+          # No registry-url: it defaults to registry.npmjs.org anyway, and setting
+          # it makes setup-node write an .npmrc with _authToken=${NODE_AUTH_TOKEN}
+          # plus a placeholder NODE_AUTH_TOKEN. With trusted publishing there is no
+          # token to fill that in, so npm would send the placeholder and get a 401
+          # instead of using the OIDC exchange.
 
       - name: Install dependencies
         run: npm ci
@@ -120,10 +124,11 @@ jobs:
 
       - name: Upgrade npm for trusted publishing
         # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 20 ships npm 10.
-        # Done here rather than before the build so the build and npm ci above
-        # keep running on the npm version pinned to the Node release.
+        # Pinned to the 11.x line rather than @latest because npm 12 requires
+        # Node >= 22. Done here rather than before the build so the build and
+        # npm ci above keep running on the npm pinned to the Node release.
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-        run: npm install -g npm@latest
+        run: npm install -g 'npm@^11.5.1'
 
       - name: Publish to npm
         # Publishes on every push to main, the same trigger as the Marketplace
