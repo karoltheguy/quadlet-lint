@@ -66,7 +66,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org' # writes the .npmrc auth stub for npm publish
+          registry-url: 'https://registry.npmjs.org' # points npm publish at the public registry
 
       - name: Install dependencies
         run: npm ci
@@ -118,21 +118,27 @@ jobs:
           path: build-artifacts/
           if-no-files-found: error
 
+      - name: Upgrade npm for trusted publishing
+        # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 20 ships npm 10.
+        # Done here rather than before the build so the build and npm ci above
+        # keep running on the npm version pinned to the Node release.
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        run: npm install -g npm@latest
+
       - name: Publish to npm
         # Publishes on every push to main, the same trigger as the Marketplace
         # publish below. Skips if this exact version is already on npm, so
         # re-running the workflow on an unchanged commit is a no-op instead of a
         # failure. npm publish runs prepublishOnly (typecheck + test + build),
-        # so the tarball is always freshly gated; --provenance attaches a signed
-        # build attestation.
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && env.NODE_AUTH_TOKEN != ''
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # so the tarball is always freshly gated. Auth is npm trusted publishing
+        # via the workflow's OIDC token (id-token: write above), so there is no
+        # npm token secret; provenance is attached automatically.
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: |
           if npm view "quadlet-lint@$VERSION" version >/dev/null 2>&1; then
             echo "quadlet-lint@$VERSION is already published; skipping."
           else
-            npm publish --provenance --access public
+            npm publish --access public
           fi
 
       - name: Publish to VS Code Marketplace
