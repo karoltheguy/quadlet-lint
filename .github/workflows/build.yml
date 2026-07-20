@@ -5,9 +5,11 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch: # manual re-run of the build + publish for the selected ref (use main)
 
 permissions:
   contents: read
+  id-token: write # required for npm publish --provenance
 
 # Serialize entire workflow runs per-ref (not just the build job) so runs
 # queue and publish in trigger order on main, instead of two builds racing
@@ -64,12 +66,27 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org' # writes the .npmrc auth stub for npm publish
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build Core, Monaco, and CLI
         run: npm run build
+
+      - name: Set shared build version
+        # Both the npm package and the VS Code extension publish an identical
+        # <major>.<minor>.<build> version. <major>.<minor> is the single source
+        # of truth in the root package.json; <build> is the repo commit count, a
+        # monotonic build number reproducible from the repo itself. Setting it on
+        # the root package.json here means the packed tarball, the published npm
+        # package, and the .vsix all carry the same version.
+        run: |
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          VERSION="$BASE.$COMMIT_COUNT"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Package npm module (Monaco & CLI distribution)
         run: |
@@ -87,16 +104,9 @@ jobs:
 
       - name: Package VS Code extension (.vsix)
         run: |
-          # Derive the version as <major>.<minor> from the ROOT package.json
-          # (the single source of truth, shared with the npm publish) plus the
-          # commit count on main as the build/patch component, so every build
-          # produces a unique, increasing version identical to the npm one
-          # (e.g. 0.1.<count>). Commit count is used instead of github.run_number
-          # because it's reproducible from the repo itself and survives workflow renames.
-          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          COMMIT_COUNT=$(git rev-list --count HEAD)
+          # Uses the shared VERSION (root major.minor + commit count) set above,
+          # so the .vsix carries the exact same version as the npm package.
           cd extensions/vscode
-          VERSION="$BASE.$COMMIT_COUNT"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npx @vscode/vsce package --no-dependencies
           mv *.vsix ../../build-artifacts/
@@ -108,8 +118,25 @@ jobs:
           path: build-artifacts/
           if-no-files-found: error
 
+      - name: Publish to npm
+        # Publishes on every push to main, the same trigger as the Marketplace
+        # publish below. Skips if this exact version is already on npm, so
+        # re-running the workflow on an unchanged commit is a no-op instead of a
+        # failure. npm publish runs prepublishOnly (typecheck + test + build),
+        # so the tarball is always freshly gated; --provenance attaches a signed
+        # build attestation.
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && env.NODE_AUTH_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "quadlet-lint@$VERSION" version >/dev/null 2>&1; then
+            echo "quadlet-lint@$VERSION is already published; skipping."
+          else
+            npm publish --provenance --access public
+          fi
+
       - name: Publish to VS Code Marketplace
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VSCE_PAT != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && env.VSCE_PAT != ''
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
@@ -117,7 +144,7 @@ jobs:
           npx @vscode/vsce publish --packagePath "$VSIX" -p "$VSCE_PAT"
 
       - name: Publish to Open VSX
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.OVSX_PAT != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && env.OVSX_PAT != ''
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
