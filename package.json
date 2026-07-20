@@ -11,6 +11,14 @@
     "monaco-editor"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karoltheguy/quadlet-lint.git"
+  },
+  "homepage": "https://github.com/karoltheguy/quadlet-lint#readme",
+  "bugs": {
+    "url": "https://github.com/karoltheguy/quadlet-lint/issues"
+  },
   "type": "module",
   "bin": {
     "quadlet-lint": "bin/quadlet-lint.mjs"
