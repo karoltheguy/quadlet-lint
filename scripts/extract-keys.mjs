@@ -19,7 +19,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
 const OUT = join(ROOT, "src", "generated", "keys.ts");
 
-const DOCS_VERSION = process.env.PODMAN_DOCS_VERSION || "latest";
+/** The released docs build the committed key snapshot targets. */
+export const DEFAULT_DOCS_VERSION = "v6.1.0";
+
+const DOCS_VERSION = process.env.PODMAN_DOCS_VERSION || DEFAULT_DOCS_VERSION;
 
 export const QUADLET_SECTIONS = [
   "Container", "Pod", "Kube", "Network", "Volume",
@@ -139,6 +142,7 @@ export async function main() {
   }
   const html = await res.text();
   const version = extractDocsVersion(html) ?? DOCS_VERSION;
+  assertPinnedVersion(version);
   const data = parseHtml(html);
 
   // 3. Emit TypeScript.
@@ -200,6 +204,20 @@ export function extractDocsVersion(html) {
   if (!html) return null;
   const match = /<meta name="readthedocs-version-slug" content="([^"]*)"\s*\/?>/i.exec(html);
   return match ? match[1] : null;
+}
+
+/** Aliases ReadTheDocs re-points as Podman releases; they name no fixed build. */
+const MOVING_ALIASES = new Set(["latest", "stable"]);
+
+/** Throw unless `version` names a fixed docs build, so the snapshot records a
+ *  version that still resolves to the same page later. */
+export function assertPinnedVersion(version) {
+  if (MOVING_ALIASES.has(version)) {
+    throw new Error(
+      `Refusing to record docs version "${version}": it is a moving alias. ` +
+      `Pass a tag, e.g. PODMAN_DOCS_VERSION=${DEFAULT_DOCS_VERSION} npm run gen:keys`,
+    );
+  }
 }
 
 /** Quote a list of identifiers as TS string literals. */
