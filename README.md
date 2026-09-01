@@ -196,9 +196,18 @@ The key and value rules all lean toward silence, and stay warnings unless the fa
 - **`QL083` (health-check durations)** is checked only for the health timing keys (`src/duration.ts`), and fires only when the value is not `disable` and is rejected by Go's `time.ParseDuration` (units `ns`/`us`/`µs`/`ms`/`s`/`m`/`h`, compound and fractional allowed). The high-value case it catches: `.container` files look like `.service` files, so users reflexively write systemd time syntax (`HealthInterval=30`, `5min`, `infinity`) that Podman's `--health-*` options reject. Go's duration unit set has been fixed since Go 1.0, so this is not a moving target; the `disable` literal is accepted on every duration key as safe insurance, and interpolated/continuation values are never judged.
 - **`QL090` (cross-unit references)** is checked only against a hand-curated, source-cited table (`src/references.ts`) of reference forms Quadlet's generator provably resolves as unit lookups (`Pod=`, `Network=`, and the source half of `Volume=`); omission is the safe default, exactly as with `QL040`/`QL070`/`QL060`. Unlike those, it stays a `warning` even though the generator does fail on a missing reference, because the linter only ever sees the files handed to it in one run — a referenced unit may genuinely exist elsewhere on the Quadlet search path, so "not found among the files being linted" is the most this check can honestly claim. It needs an explicit `unitIndex` option to activate at all, and never fires on drop-in `.conf` files. `Pod=` is single-valued and last-wins (only the final occurrence is checked, matching the generator); `Network=` and the `Volume=` source are multi-valued and checked per occurrence.
 
+  The search path Quadlet itself scans, in precedence order, is:
+
+  - Rootful: `/run/containers/systemd/`, `/etc/containers/systemd/`, `/usr/share/containers/systemd/`.
+  - Rootless: `$XDG_RUNTIME_DIR/containers/systemd/`, `$XDG_CONFIG_HOME/containers/systemd/` (or `~/.config/containers/systemd/`), `/etc/containers/systemd/users/${UID}`, `/etc/containers/systemd/users/`, `/usr/share/containers/systemd/users/${UID}`, `/usr/share/containers/systemd/users/`.
+
+  Podman 6.0 added the last two rootless entries, so a unit installed by a distribution package can now sit outside any directory you pass to the linter.
+
 ### Where the key data comes from
 
-The per-section key lists and their repeatability are [extracted from the official Podman man page](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) into a committed data file, [`src/generated/keys.ts`](src/generated/keys.ts). 
+The per-section key lists and their repeatability are [extracted from the official Podman man page](https://docs.podman.io/en/v6.1.0/markdown/podman-systemd.unit.5.html) into a committed data file, [`src/generated/keys.ts`](src/generated/keys.ts).
+
+**quadlet-lint currently targets Podman 6.1.0.** The generated file records this as `PODMAN_DOCS_VERSION`, so the exact doc build behind any snapshot is always readable from the data itself. Generation is pinned to a release tag and refuses to record a moving alias such as `latest` or `stable`, since those track Podman's main branch and would let unreleased keys into the snapshot. 
 
 **The committed data is a snapshot, not a live feed.** It reflects the doc as of the last regeneration and ships frozen in the published package, so clients get whatever was current when that version was published. 
 
@@ -206,6 +215,8 @@ Keeping key data current is a maintenance step: regenerate against upstream, san
 
 ```sh
 npm run gen:keys   # 1. re-extract src/generated/keys.ts (fetches upstream live)
+                   #    to move to a new release, bump DEFAULT_DOCS_VERSION first,
+                   #    or override once: PODMAN_DOCS_VERSION=v6.2.0 npm run gen:keys
 npm test           # 2. sanity-check the regenerated data
 # 3. commit + publish a new version
 ```
