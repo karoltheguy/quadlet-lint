@@ -5,3 +5,5 @@ demo/dist-demo/
 .DS_Store
 .claude
 .vscode/
+# Coverage report output.
+coverage/

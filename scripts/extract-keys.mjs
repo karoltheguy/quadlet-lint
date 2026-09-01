@@ -19,7 +19,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
 const OUT = join(ROOT, "src", "generated", "keys.ts");
 
-const UPSTREAM = "https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html";
+const DOCS_VERSION = process.env.PODMAN_DOCS_VERSION || "latest";
 
 export const QUADLET_SECTIONS = [
   "Container", "Pod", "Kube", "Network", "Volume",
@@ -131,12 +131,14 @@ export function parseHtml(html) {
 }
 
 export async function main() {
-  console.log(`Fetching upstream reference: ${UPSTREAM}`);
-  const res = await fetch(UPSTREAM);
+  const url = upstreamUrl(DOCS_VERSION);
+  console.log(`Fetching upstream reference: ${url}`);
+  const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to fetch ${UPSTREAM}: ${res.statusText}`);
+    throw new Error(`Failed to fetch ${url}: ${res.statusText}`);
   }
   const html = await res.text();
+  const version = extractDocsVersion(html) ?? DOCS_VERSION;
   const data = parseHtml(html);
 
   // 3. Emit TypeScript.
@@ -151,9 +153,13 @@ export async function main() {
   }).join("\n");
 
   const out = `// AUTO-GENERATED — do not edit by hand.
-// Source: ${UPSTREAM}
+// Source: ${url}
 // Regenerate with: npm run gen:keys
 // Generated: ${today}
+// Podman docs version: ${version}
+
+/** The Podman documentation version this key data was generated from. */
+export const PODMAN_DOCS_VERSION = ${JSON.stringify(version)};
 
 export interface SectionKeys {
   /** Every key documented as valid in this section. */
@@ -181,6 +187,19 @@ ${body}
     const { valid, singleValue, descriptions } = data.get(section);
     console.log(`  [${section}] ${valid.size} keys, ${singleValue.size} single-valued, ${descriptions.size} described`);
   }
+}
+
+/** Return the upstream documentation URL for a given version. */
+export function upstreamUrl(version) {
+  const v = version || "latest";
+  return `https://docs.podman.io/en/${v}/markdown/podman-systemd.unit.5.html`;
+}
+
+/** Extract the ReadTheDocs version slug from HTML metadata. */
+export function extractDocsVersion(html) {
+  if (!html) return null;
+  const match = /<meta name="readthedocs-version-slug" content="([^"]*)"\s*\/?>/i.exec(html);
+  return match ? match[1] : null;
 }
 
 /** Quote a list of identifiers as TS string literals. */
