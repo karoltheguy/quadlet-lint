@@ -1,7 +1,11 @@
 // AUTO-GENERATED — do not edit by hand.
-// Source: https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+// Source: https://docs.podman.io/en/v6.1.0/markdown/podman-systemd.unit.5.html
 // Regenerate with: npm run gen:keys
-// Generated: 2026-07-15
+// Generated: 2026-09-01
+// Podman docs version: v6.1.0
+
+/** The Podman documentation version this key data was generated from. */
+export const PODMAN_DOCS_VERSION = "v6.1.0";
 
 export interface SectionKeys {
   /** Every key documented as valid in this section. */
