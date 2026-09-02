@@ -1,0 +1,17 @@
+[Unit]
+Description=Artifact section, added in Podman 6.0
+
+[Artifact]
+Artifact=https://example.com/config.tar.gz
+AuthFile=/etc/containers/auth.json
+CertDir=/etc/containers/certs.d
+ContainersConfModule=/etc/containers/containers.conf.d/10-example.conf
+Creds=user:secret
+DecryptionKey=/etc/containers/keys/artifact.key
+GlobalArgs=--log-level=info
+PodmanArgs=--retry=2
+Quiet=true
+Retry=3
+RetryDelay=5s
+ServiceName=podman6-artifact
+TLSVerify=true

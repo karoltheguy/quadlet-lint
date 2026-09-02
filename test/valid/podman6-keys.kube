@@ -1,0 +1,6 @@
+[Unit]
+Description=Kube keys added in Podman 6.0 and 6.1
+
+[Kube]
+Yaml=app.yaml
+ServiceName=podman6-kube

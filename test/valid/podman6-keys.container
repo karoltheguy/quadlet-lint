@@ -1,0 +1,9 @@
+[Unit]
+Description=Container keys added in Podman 6.0 and 6.1
+
+[Container]
+Image=docker.io/library/alpine:latest
+AppArmor=unconfined
+HttpProxy=true
+ImageVolume=bind
+ServiceName=podman6-container

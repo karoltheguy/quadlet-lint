@@ -1,0 +1,8 @@
+[Unit]
+Description=Volume keys added in Podman 6.0 and 6.1
+
+[Volume]
+VolumeName=podman6-volume
+UID=1000
+GID=1000
+ServiceName=podman6-volume

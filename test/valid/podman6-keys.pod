@@ -1,0 +1,6 @@
+[Unit]
+Description=Pod keys added in Podman 6.0 and 6.1
+
+[Pod]
+PodName=podman6-pod
+StopTimeout=30
