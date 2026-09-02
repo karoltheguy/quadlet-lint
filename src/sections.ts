@@ -17,6 +17,7 @@ import { PORT_FORMAT_KEYS } from "./ports.js";
 import { ADD_HOST_KEYS } from "./addhost.js";
 import { BYTE_SIZE_KEYS } from "./bytesize.js";
 import { DURATION_KEYS } from "./duration.js";
+import { REMOVED_NETWORK_KEYS } from "./removed.js";
 import {
   SECTION_REQUIRED,
   SECTION_CONDITIONAL,
@@ -125,6 +126,15 @@ export function hasByteSizeFormat(section: string, key: string): boolean {
  */
 export function hasDurationFormat(section: string, key: string): boolean {
   return DURATION_KEYS[section]?.has(key) ?? false;
+}
+
+/**
+ * Whether `key` in `section` carries a Podman network value (see
+ * {@link REMOVED_NETWORK_KEYS}), and is therefore a candidate for QL084
+ * removed-option checking.
+ */
+export function hasRemovedNetworkValue(section: string, key: string): boolean {
+  return REMOVED_NETWORK_KEYS[section]?.has(key) ?? false;
 }
 
 /**

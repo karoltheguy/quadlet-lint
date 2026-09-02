@@ -27,6 +27,7 @@ import {
   hasAddHostFormat,
   hasByteSizeFormat,
   hasDurationFormat,
+  hasRemovedNetworkValue,
 } from "./sections.js";
 import { findBestMatch } from "./levenshtein.js";
 import { SECTION_REFERENCES } from "./references.js";
@@ -35,6 +36,7 @@ import { isMalformedPortValue } from "./ports.js";
 import { isMalformedAddHost } from "./addhost.js";
 import { isMalformedByteSize } from "./bytesize.js";
 import { isMalformedDuration } from "./duration.js";
+import { REMOVED_ARG_KEYS, isRemovedNetworkValue, hasRemovedArg } from "./removed.js";
 
 export type Severity = "error" | "warning";
 
@@ -78,6 +80,8 @@ export const Codes = {
   BYTE_SIZE_FORMAT: "QL082",
   /** A health-check timing key whose value is not a valid Go duration. */
   DURATION_FORMAT: "QL083",
+  /** A value naming an option Podman 6.0 removed. */
+  REMOVED_IN_PODMAN6: "QL084",
   /**
    * A file-specific Quadlet section that doesn't match the file's type, or
    * the expected section missing entirely.
@@ -471,6 +475,33 @@ export function lintQuadlet(
             severity: "warning",
             code: Codes.DURATION_FORMAT,
             message: `Malformed duration value "${value}" for ${key}= — expected a Go-style duration such as 30s, 1m30s, or 500ms (systemd forms like "30" or "5min" are not accepted), or "disable". It may also be valid in a newer Podman version.`,
+          });
+        }
+      }
+
+      // Removed-option detection: Podman 6.0 dropped the slirp4netns network
+      // stack and the --network-cmd-path option that served it. These stay
+      // valid on Podman 5, so this is a warning about a future break rather
+      // than a claim the file is wrong today. Reuses the QL040/QL080/QL081/
+      // QL082/QL083 interpolation bypass.
+      if (value !== "" && !hasInterpolation) {
+        if (hasRemovedNetworkValue(currentSection, key) && isRemovedNetworkValue(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.REMOVED_IN_PODMAN6,
+            message: `Network value "${value}" uses the slirp4netns stack, removed in Podman 6.0 — use pasta instead. It still works on Podman 5.`,
+          });
+        } else if (REMOVED_ARG_KEYS.has(key) && hasRemovedArg(value)) {
+          diagnostics.push({
+            line: lineNo,
+            startColumn: valueStart + 1,
+            endColumn: valueStart + value.length + 1,
+            severity: "warning",
+            code: Codes.REMOVED_IN_PODMAN6,
+            message: `${key}= passes --network-cmd-path, removed in Podman 6.0 along with slirp4netns. It still works on Podman 5.`,
           });
         }
       }

@@ -789,3 +789,44 @@ describe("suppression comments (# quadlet-lint-disable-next-line)", () => {
     expect(diags.some((d) => d.code === Codes.UNKNOWN_SECTION)).toBe(true);
   });
 });
+
+describe("QL084 options removed in Podman 6", () => {
+  /** Convenience: QL084 diagnostics present in a lint run. */
+  function ql084(text: string): Diagnostic[] {
+    return lintQuadlet(text).filter((d) => d.code === "QL084");
+  }
+
+  it("flags Network=slirp4netns in [Container]", () => {
+    const diags = ql084("[Container]\nImage=alpine\nNetwork=slirp4netns");
+    expect(diags).toHaveLength(1);
+    expect(diags[0]).toMatchObject({ code: "QL084", severity: "warning" });
+  });
+
+  it("flags the slirp4netns:options form", () => {
+    expect(ql084("[Container]\nNetwork=slirp4netns:port_handler=slirp4netns")).toHaveLength(1);
+  });
+
+  it("flags slirp4netns in [Pod] and [Kube]", () => {
+    expect(ql084("[Pod]\nNetwork=slirp4netns")).toHaveLength(1);
+    expect(ql084("[Kube]\nNetwork=slirp4netns")).toHaveLength(1);
+  });
+
+  it("flags --network-cmd-path in PodmanArgs= and GlobalArgs=", () => {
+    expect(ql084("[Container]\nPodmanArgs=--network-cmd-path=/usr/bin/slirp4netns")).toHaveLength(1);
+    expect(ql084("[Container]\nGlobalArgs=--network-cmd-path /usr/bin/slirp4netns")).toHaveLength(1);
+  });
+
+  it("never flags a Netavark network name or the pasta replacement", () => {
+    expect(ql084("[Container]\nNetwork=private-net.network")).toEqual([]);
+    expect(ql084("[Container]\nNetwork=pasta")).toEqual([]);
+    expect(ql084("[Container]\nNetwork=host")).toEqual([]);
+  });
+
+  it("never flags a network name that merely contains the removed token", () => {
+    expect(ql084("[Container]\nNetwork=my-slirp4netns-clone.network")).toEqual([]);
+  });
+
+  it("does not judge interpolated values", () => {
+    expect(ql084("[Container]\nNetwork=${NET}")).toEqual([]);
+  });
+});
