@@ -1,0 +1,6 @@
+[Container]
+Image=alpine
+# QL084
+Network=slirp4netns
+# QL084
+PodmanArgs=--network-cmd-path=/usr/bin/slirp4netns

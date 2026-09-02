@@ -56,6 +56,7 @@ describe("comprehensive invalid quadlets", () => {
     "bad-ports.container": ["QL080"],
     "bad-hosts.container": ["QL081"],
     "bad-bytes.container": ["QL082"],
+    "removed-podman6.container": ["QL084", "QL084"],
     "mismatch.container": ["QL050", "QL050"],
     "missing-section.network": ["QL050"],
     "missing-reqs.build": ["QL060", "QL060"],
