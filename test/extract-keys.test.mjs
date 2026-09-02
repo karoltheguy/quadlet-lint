@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractDocsVersion, upstreamUrl, assertPinnedVersion, DEFAULT_DOCS_VERSION } from "../scripts/extract-keys.mjs";
+import { extractDocsVersion, upstreamUrl, assertPinnedVersion, DEFAULT_DOCS_VERSION, assertSectionsPopulated, QUADLET_SECTIONS } from "../scripts/extract-keys.mjs";
 
 describe("extractDocsVersion", () => {
   it("extracts version slug from readthedocs meta tag", () => {
@@ -31,5 +31,25 @@ describe("assertPinnedVersion", () => {
 describe("DEFAULT_DOCS_VERSION", () => {
   it("is a pinned tag, not a moving alias", () => {
     expect(() => assertPinnedVersion(DEFAULT_DOCS_VERSION)).not.toThrow();
+  });
+});
+
+describe("assertSectionsPopulated", () => {
+  const populated = () =>
+    new Map(QUADLET_SECTIONS.map((s) => [s, { valid: new Set(["Image"]) }]));
+
+  it("rejects a parse where every section is empty", () => {
+    const empty = new Map(QUADLET_SECTIONS.map((s) => [s, { valid: new Set() }]));
+    expect(() => assertSectionsPopulated(empty)).toThrow(/Container/);
+  });
+
+  it("names the empty section when only one failed to parse", () => {
+    const data = populated();
+    data.set("Volume", { valid: new Set() });
+    expect(() => assertSectionsPopulated(data)).toThrow(/Volume/);
+  });
+
+  it("accepts a section carrying a single key", () => {
+    expect(() => assertSectionsPopulated(populated())).not.toThrow();
   });
 });
