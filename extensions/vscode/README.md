@@ -25,6 +25,7 @@ Catch configuration errors before deployment with real-time Podman [Quadlet](htt
 - **Quick fixes**: one-click corrections for common mistakes.
 - **Syntax highlighting**: a dedicated grammar for Quadlet unit files.
 - **Zero false errors**: anything reported as an `error` would genuinely fail systemd/Quadlet; anything uncertain is at most a `warning`.
+- **Targets Podman 6**: key data generated from the Podman 6.1.0 documentation, including a warning for the options 6.0 removed. Podman 5 unit files still lint correctly.
 
 ## Supported files
 
