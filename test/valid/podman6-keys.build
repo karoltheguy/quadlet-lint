@@ -1,0 +1,9 @@
+[Unit]
+Description=Build keys added in Podman 6.0 and 6.1
+
+[Build]
+ImageTag=podman6-build:latest
+File=Containerfile
+BuildArg=VERSION=1.0
+IgnoreFile=.containerignore
+ServiceName=podman6-build

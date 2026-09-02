@@ -1,0 +1,6 @@
+[Unit]
+Description=Network keys added in Podman 6.0 and 6.1
+
+[Network]
+NetworkName=podman6-network
+ServiceName=podman6-network
