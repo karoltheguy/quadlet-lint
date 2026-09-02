@@ -144,6 +144,7 @@ export async function main() {
   const version = extractDocsVersion(html) ?? DOCS_VERSION;
   assertPinnedVersion(version);
   const data = parseHtml(html);
+  assertSectionsPopulated(data);
 
   // 3. Emit TypeScript.
   const today = new Date().toISOString().slice(0, 10);
@@ -204,6 +205,21 @@ export function extractDocsVersion(html) {
   if (!html) return null;
   const match = /<meta name="readthedocs-version-slug" content="([^"]*)"\s*\/?>/i.exec(html);
   return match ? match[1] : null;
+}
+
+/** Throw if any section parsed to zero keys, so a page whose headings the
+ *  parser no longer recognizes fails the run instead of writing an empty
+ *  snapshot that would flag every key in every unit file as unknown. */
+export function assertSectionsPopulated(data) {
+  const empty = [...data.entries()]
+    .filter(([, section]) => section.valid.size === 0)
+    .map(([name]) => name);
+  if (empty.length > 0) {
+    throw new Error(
+      `Parsed zero keys for: ${empty.join(", ")}. ` +
+      `The source page's section headings likely changed; refusing to write ${OUT}.`,
+    );
+  }
 }
 
 /** Aliases ReadTheDocs re-points as Podman releases; they name no fixed build. */
